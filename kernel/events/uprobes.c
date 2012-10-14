@@ -1860,8 +1860,14 @@ static struct notifier_block uprobe_exception_nb = {
 	.priority		= INT_MAX-1,	/* notified after kprobes, kgdb */
 };
 
+int __weak __init arch_uprobes_init(void)
+{
+	return 0;
+}
+
 static int __init init_uprobes(void)
 {
+	int ret;
 	int i;
 
 	for (i = 0; i < UPROBES_HASH_SZ; i++)
@@ -1869,6 +1875,10 @@ static int __init init_uprobes(void)
 
 	if (percpu_init_rwsem(&dup_mmap_sem))
 		return -ENOMEM;
+
+	ret = arch_uprobes_init();
+	if (ret)
+		return ret;
 
 	return register_die_notifier(&uprobe_exception_nb);
 }
