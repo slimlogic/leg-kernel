@@ -242,6 +242,65 @@ static int __init setup_acpi_rsdp(char *arg)
 early_param("acpi_rsdp", setup_acpi_rsdp);
 #endif
 
+#if defined(CONFIG_ARM) || defined(CONFIG_ARM64)
+#include <asm/acpi.h>
+#include <acpi/actbl.h>
+
+void acpi_find_arm_root_pointer(acpi_physical_address *pa)
+{
+	/* BOZO: temporarily clunky.
+	 * What we do is, while using u-boot still, is use the values
+	 * that have already been retrieved from the FDT node
+	 * (/chosen/linux,acpi-start and /chosen/linux,acpi-len) which
+	 * contain the address of the first byte of the RSDP after it
+	 * has been loaded into RAM during u-boot (e.g., using something
+	 * like fatload mmc 0:2 42008000 my.blob), and the size of the
+	 * data in the complete ACPI blob.  We only do this since we have
+	 * to collaborate with FDT so we have to load FDT and the ACPI
+	 * tables in but only have one address we can use via bootm.
+	 * With UEFI, we should just be able to use the efi_enabled
+	 * branch below in acpi_os_get_root_pointer().
+	 */
+
+	void *address;
+	struct acpi_table_rsdp *rp;
+
+	if (!acpi_arm_rsdp_info.phys_address && !acpi_arm_rsdp_info.size) {
+		printk(KERN_ERR "(E) ACPI: failed to find rsdp info\n");
+		*pa = (acpi_physical_address)NULL;
+		return;
+	}
+
+	address = phys_to_virt(acpi_arm_rsdp_info.phys_address);
+	address += ACPI_BLOB_HEADER_SIZE;
+	*pa = (acpi_physical_address)address;
+
+	rp = (struct acpi_table_rsdp *)address;
+	printk(KERN_DEBUG "(I) ACPI rsdp rp: 0x%08lx\n", (long unsigned int)rp);
+	if (rp) {
+		printk(KERN_DEBUG "(I) ACPI rsdp content:\n");
+		printk(KERN_DEBUG "(I)    signature: %.8s\n", rp->signature);
+		printk(KERN_DEBUG "(I)    checksum: 0x%02x\n", rp->checksum);
+		printk(KERN_DEBUG "(I)    oem_id: %.6s\n", rp->oem_id);
+		printk(KERN_DEBUG "(I)    revision: %d\n", rp->revision);
+		printk(KERN_DEBUG "(I)    rsdt: 0x%08lX\n",
+				(long unsigned int)rp->rsdt_physical_address);
+		printk(KERN_DEBUG "(I)    length: %d\n", rp->length);
+		printk(KERN_DEBUG "(I)    xsdt: 0x%016llX\n",
+				(u64)rp->xsdt_physical_address);
+		printk(KERN_DEBUG "(I)    x_checksum: 0x%02x\n",
+				rp->extended_checksum);
+
+	*pa = (acpi_physical_address)(virt_to_phys(rp));
+	} else {
+		printk(KERN_ERR "(E) ACPI missing rsdp info\n");
+		*pa = (acpi_physical_address)NULL;
+	}
+
+	return;
+}
+#endif
+
 acpi_physical_address __init acpi_os_get_root_pointer(void)
 {
 #ifdef CONFIG_KEXEC
@@ -262,7 +321,11 @@ acpi_physical_address __init acpi_os_get_root_pointer(void)
 	} else {
 		acpi_physical_address pa = 0;
 
+#if defined(CONFIG_ARM) || defined(CONFIG_ARM64)
+		acpi_find_arm_root_pointer(&pa);
+#else
 		acpi_find_root_pointer(&pa);
+#endif
 		return pa;
 	}
 }
@@ -372,6 +435,7 @@ acpi_os_map_memory(acpi_physical_address phys, acpi_size size)
 		return __acpi_map_table((unsigned long)phys, size);
 
 	mutex_lock(&acpi_ioremap_lock);
+
 	/* Check if there's a suitable mapping already. */
 	map = acpi_map_lookup(phys, size);
 	if (map) {
