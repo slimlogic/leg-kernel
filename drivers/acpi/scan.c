@@ -2060,8 +2060,10 @@ int __init acpi_scan_init(void)
 		printk(KERN_ERR PREFIX "Could not register bus type\n");
 	}
 
+#if defined(CONFIG_PCI)
 	acpi_pci_root_init();
 	acpi_pci_link_init();
+#endif
 	acpi_processor_init();
 	acpi_platform_init();
 	acpi_lpss_init();
@@ -2090,7 +2092,9 @@ int __init acpi_scan_init(void)
 
 	acpi_update_all_gpes();
 
+#if defined(CONFIG_PCI)
 	acpi_pci_root_hp_init();
+#endif
 
  out:
 	mutex_unlock(&acpi_scan_lock);
