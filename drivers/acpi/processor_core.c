@@ -164,9 +164,6 @@ exit:
 
 int acpi_get_cpuid(acpi_handle handle, int type, u32 acpi_id)
 {
-#ifdef CONFIG_SMP
-	int i;
-#endif
 	int apic_id = -1;
 
 	apic_id = map_mat_entry(handle, type, acpi_id);
@@ -199,16 +196,32 @@ int acpi_get_cpuid(acpi_handle handle, int type, u32 acpi_id)
 			return apic_id;
 	}
 
+#if defined(CONFIG_ARM) || defined(CONFIG_ARM64)
+
+	/*
+	 * BOZO: need to abstract this out to have it make sense --
+	 * it's not that ARM has no equivalent, it's that apic_id is
+	 * arch-specific
+	 */
+
+#else
+
 #ifdef CONFIG_SMP
-	for_each_possible_cpu(i) {
-		if (cpu_physical_id(i) == apic_id)
-			return i;
+	{
+		int i;
+		for_each_possible_cpu(i) {
+			if (cpu_physical_id(i) == apic_id)
+				return i;
+		}
 	}
 #else
 	/* In UP kernel, only processor 0 is valid */
 	if (apic_id == 0)
 		return apic_id;
 #endif
+
+#endif /* defined(CONFIG_ARM) || defined(CONFIG_ARM64) */
+
 	return -1;
 }
 EXPORT_SYMBOL_GPL(acpi_get_cpuid);
