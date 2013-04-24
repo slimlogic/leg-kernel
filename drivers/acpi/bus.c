@@ -79,10 +79,6 @@ static struct dmi_system_id dsdt_dmi_table[] __initdata = {
 	},
 	{}
 };
-#else
-static struct dmi_system_id dsdt_dmi_table[] __initdata = {
-	{}
-};
 #endif
 
 /* --------------------------------------------------------------------------
@@ -616,6 +612,9 @@ static int __init acpi_bus_init_irq(void)
 	case ACPI_IRQ_MODEL_PLATFORM:
 		message = "platform specific model";
 		break;
+	case ACPI_IRQ_MODEL_GIC:
+		message = "GIC";
+		break;
 	default:
 		printk(KERN_WARNING PREFIX "Unknown interrupt routing model\n");
 		return -ENODEV;
@@ -652,11 +651,15 @@ void __init acpi_early_init(void)
 
 	acpi_gbl_permanent_mmap = 1;
 
+#ifdef CONFIG_X86
 	/*
+	 * NB: ARM does not use DMI; only older Intel products do.
+	 *
 	 * If the machine falls into the DMI check table,
 	 * DSDT will be copied to memory
 	 */
 	dmi_check_system(dsdt_dmi_table);
+#endif
 
 	status = acpi_reallocate_root_table();
 	if (ACPI_FAILURE(status)) {

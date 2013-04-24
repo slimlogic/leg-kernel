@@ -1020,9 +1020,18 @@ acpi_os_read_pci_configuration(struct acpi_pci_id * pci_id, u32 reg,
 		return AE_ERROR;
 	}
 
+#ifdef CONFIG_X86
+	/*
+	 * BOZO: probably should not call this function at all
+	 * if there is no PCI...
+	 */
 	result = raw_pci_read(pci_id->segment, pci_id->bus,
 				PCI_DEVFN(pci_id->device, pci_id->function),
 				reg, size, &value32);
+#else
+	result = 0;
+	value32 = 0;
+#endif
 	*value = value32;
 
 	return (result ? AE_ERROR : AE_OK);
@@ -1048,9 +1057,14 @@ acpi_os_write_pci_configuration(struct acpi_pci_id * pci_id, u32 reg,
 		return AE_ERROR;
 	}
 
+#ifdef CONFIG_X86
+	/* BOZO: how do we handle not having PCI? */
 	result = raw_pci_write(pci_id->segment, pci_id->bus,
 				PCI_DEVFN(pci_id->device, pci_id->function),
 				reg, size, value);
+#else
+	result = 0;
+#endif
 
 	return (result ? AE_ERROR : AE_OK);
 }
