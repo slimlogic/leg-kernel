@@ -79,10 +79,6 @@ static struct dmi_system_id dsdt_dmi_table[] __initdata = {
 	},
 	{}
 };
-#else
-static struct dmi_system_id dsdt_dmi_table[] __initdata = {
-	{}
-};
 #endif
 
 /* --------------------------------------------------------------------------
