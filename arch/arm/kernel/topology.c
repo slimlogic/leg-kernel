@@ -460,15 +460,38 @@ void __init init_cpu_topology(void)
 	parse_dt_topology();
 }
 
+#ifdef CONFIG_HOTPLUG_CPU
+int __ref arch_register_cpu(int cpu)
+{
+	struct cpuinfo_arm *cpuinfo = &per_cpu(cpu_data, cpu);
+
+	/* BSP cann't be taken down on arm */
+	if (cpu)
+		cpuinfo->cpu.hotpluggable = 1;
+
+	return register_cpu(&cpuinfo->cpu, cpu);
+}
+EXPORT_SYMBOL(arch_register_cpu);
+
+void arch_unregister_cpu(int cpu)
+{
+	unregister_cpu(&per_cpu(cpu_data, cpu).cpu);
+}
+EXPORT_SYMBOL(arch_unregister_cpu);
+#else /* CONFIG_HOTPLUG_CPU */
+
+static int __init arch_register_cpu(int cpu)
+{
+	return register_cpu(&per_cpu(cpu_data, cpu).cpu, cpu);
+}
+#endif /* CONFIG_HOTPLUG_CPU */
+
 static int __init topology_init(void)
 {
 	int cpu;
 
-	for_each_possible_cpu(cpu) {
-		struct cpuinfo_arm *cpuinfo = &per_cpu(cpu_data, cpu);
-		cpuinfo->cpu.hotpluggable = 1;
-		register_cpu(&cpuinfo->cpu, cpu);
-	}
+	for_each_present_cpu(cpu)
+		arch_register_cpu(cpu);
 
 	return 0;
 }
