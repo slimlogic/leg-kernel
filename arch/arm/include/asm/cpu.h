@@ -12,6 +12,7 @@
 
 #include <linux/percpu.h>
 #include <linux/cpu.h>
+#include <linux/topology.h>
 
 struct cpuinfo_arm {
 	struct cpu	cpu;
@@ -20,6 +21,11 @@ struct cpuinfo_arm {
 	unsigned int	loops_per_jiffy;
 #endif
 };
+
+#ifdef CONFIG_HOTPLUG_CPU
+extern int arch_register_cpu(int cpu);
+extern void arch_unregister_cpu(int cpu);
+#endif
 
 DECLARE_PER_CPU(struct cpuinfo_arm, cpu_data);
 
