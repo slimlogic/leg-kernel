@@ -289,6 +289,17 @@ void store_cpu_topology(unsigned int cpuid)
 		cpu_topology[cpuid].socket_id, mpidr);
 }
 
+void arch_fix_phys_package_id(int num, u32 slot)
+{
+#ifdef CONFIG_SMP
+	struct cputopo_arm *cpuid_topo = &cpu_topology[num];
+
+	if (cpuid_topo->socket_id == -1)
+		cpuid_topo->socket_id = slot;
+#endif
+}
+EXPORT_SYMBOL_GPL(arch_fix_phys_package_id);
+
 /*
  * cluster_to_logical_mask - return cpu logical mask of CPUs in a cluster
  * @socket_id:		cluster HW identifier
