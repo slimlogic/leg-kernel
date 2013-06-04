@@ -24,6 +24,7 @@
 
 #include <asm/cputype.h>
 #include <asm/topology.h>
+#include <asm/cpu.h>
 
 /*
  * cpu power scale management
@@ -351,3 +352,18 @@ void __init init_cpu_topology(void)
 
 	parse_dt_topology();
 }
+
+static int __init topology_init(void)
+{
+	int cpu;
+
+	for_each_possible_cpu(cpu) {
+		struct cpuinfo_arm *cpuinfo = &per_cpu(cpu_data, cpu);
+		cpuinfo->cpu.hotpluggable = 1;
+		register_cpu(&cpuinfo->cpu, cpu);
+	}
+
+	return 0;
+}
+subsys_initcall(topology_init);
+
