@@ -27,6 +27,7 @@ void init_cpu_topology(void);
 void store_cpu_topology(unsigned int cpuid);
 const struct cpumask *cpu_coregroup_mask(int cpu);
 int cluster_to_logical_mask(unsigned int socket_id, cpumask_t *cluster_mask);
+void arch_fix_phys_package_id(int num, u32 slot);
 
 #else
 
