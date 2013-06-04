@@ -396,6 +396,16 @@ void __init arch_get_hmp_domains(struct list_head *hmp_domains_list)
 }
 #endif /* CONFIG_SCHED_HMP */
 
+void arch_fix_phys_package_id(int num, u32 slot)
+{
+#ifdef CONFIG_SMP
+	struct cputopo_arm *cpuid_topo = &cpu_topology[num];
+
+	if (cpuid_topo->socket_id == -1)
+		cpuid_topo->socket_id = slot;
+#endif
+}
+EXPORT_SYMBOL_GPL(arch_fix_phys_package_id);
 
 /*
  * cluster_to_logical_mask - return cpu logical mask of CPUs in a cluster
