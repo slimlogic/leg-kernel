@@ -41,6 +41,9 @@
 #include <linux/memblock.h>
 #include <linux/of_fdt.h>
 #include <linux/of_platform.h>
+#ifdef CONFIG_ACPI
+#include <linux/acpi.h>
+#endif
 
 #include <asm/cputype.h>
 #include <asm/elf.h>
@@ -53,6 +56,10 @@
 #include <asm/traps.h>
 #include <asm/memblock.h>
 #include <asm/psci.h>
+
+#ifdef CONFIG_ACPI
+#include <asm/acpi.h>
+#endif
 
 unsigned int processor_id;
 EXPORT_SYMBOL(processor_id);
@@ -166,6 +173,10 @@ static void __init setup_machine_fdt(phys_addr_t dt_phys)
 
 	/* Retrieve various information from the /chosen node */
 	of_scan_flat_dt(early_init_dt_scan_chosen, boot_command_line);
+#ifdef CONFIG_ACPI
+	/* Retrieve ACPI pointers from /chosen node */
+	of_scan_flat_dt(early_init_dt_scan_acpi, &acpi_arm_rsdp_info);
+#endif
 	/* Initialize {size,address}-cells info */
 	of_scan_flat_dt(early_init_dt_scan_root, NULL);
 	/* Setup memory, calling early_init_dt_add_memory_arch */
@@ -263,6 +274,14 @@ void __init setup_arch(char **cmdline_p)
 
 	paging_init();
 	request_standard_resources();
+
+#ifdef CONFIG_ACPI
+	/*
+	 * Parse the ACPI tables for possible boot-time configuration
+	 */
+	acpi_boot_table_init();
+	early_acpi_boot_init();
+#endif
 
 	unflatten_device_tree();
 
