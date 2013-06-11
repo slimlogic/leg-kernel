@@ -27,3 +27,6 @@ extra-y					:= $(head-y) vmlinux.lds
 # vDSO - this must be built first to generate the symbol offsets
 $(call objectify,$(arm64-obj-y)): $(obj)/vdso/vdso-offsets.h
 $(obj)/vdso/vdso-offsets.h: $(obj)/vdso
+
+obj-$(CONFIG_ACPI)			+= acpi/
+
