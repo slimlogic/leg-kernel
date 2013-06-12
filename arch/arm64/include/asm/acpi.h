@@ -54,32 +54,6 @@
 #define ACPI_ENABLE_IRQS()  local_irq_enable()
 #define ACPI_FLUSH_CPU_CACHE() flush_cache_all()
 
-#define ACPI_DIV_64_BY_32(n_hi, n_lo, d32, q32, r32) (\
-	asm ("mov	r0, %2\n"					\
-	     "mov	r1, %3\n"					\
-	     "mov	r2, %4\n"					\
-	     "bl	__arm_acpi_div_64_by_32\n"			\
-	     "mov	%0, r0\n"					\
-	     "mov	%1, r1\n"					\
-	     : "=r"(q32), "=r"(r32)			/* output */	\
-	     : "r"(n_hi), "r"(n_lo), "r"(d32)		/* input */	\
-	     : "r0", "r1", "r2"		/* clobbered registers */	\
-	))
-
-#define ACPI_SHIFT_RIGHT_64(n_hi, n_lo) (\
-	asm ("mov	r0, %2\n"					\
-	     "mov	r1, %3\n"					\
-	     "and	r2, r0, #1\n"					\
-	     "lsr	r0, r0, #1\n"					\
-	     "lsr	r1, r1, #1\n"					\
-	     "orr	r1, r1, r2, lsl #31\n"				\
-	     "mov	%0, r0\n"					\
-	     "mov	%1, r1\n"					\
-	     : "=r"(n_hi), "=r"(n_lo)	/* output operands */		\
-	     : "0"(n_hi), "1"(n_lo)		/* input operands */	\
-	     : "r0", "r1", "r2"	/* clobbered registers */		\
-	))
-
 /* Blob handling macros */
 #define	ACPI_BLOB_HEADER_SIZE	8
 
