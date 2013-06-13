@@ -1,5 +1,5 @@
 /*
- *  Copyright (C) 2013, Al Stone <ahs3@redhat.com>
+ *  Copyright (C) 2013, Al Stone <al.stone@linaro.org>
  *
  * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
  *
