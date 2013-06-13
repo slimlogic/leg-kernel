@@ -3,7 +3,7 @@
  *
  *  Copyright (C) 2001, 2002 Paul Diefenbaugh <paul.s.diefenbaugh@intel.com>
  *  Copyright (C) 2001 Jun Nakajima <jun.nakajima@intel.com>
- *  Copyright (C) 2013, Al Stone <ahs3@redhat.com> (ARM version)
+ *  Copyright (C) 2013, Al Stone <al.stone@linaro.org> (ARM version)
  *
  * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
  *
