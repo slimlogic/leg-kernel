@@ -13,6 +13,7 @@
 #include <linux/nls.h>
 
 #include <acpi/acpi_drivers.h>
+#include <acpi/apei.h>
 
 #include "internal.h"
 
@@ -2060,6 +2061,7 @@ int __init acpi_scan_init(void)
 		printk(KERN_ERR PREFIX "Could not register bus type\n");
 	}
 
+	acpi_hest_init();
 #if defined(CONFIG_PCI)
 	acpi_pci_root_init();
 	acpi_pci_link_init();
