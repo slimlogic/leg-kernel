@@ -201,7 +201,7 @@ static void ghes_iounmap_nmi(void __iomem *vaddr_ptr)
 
 	BUG_ON(vaddr != (unsigned long)GHES_IOREMAP_NMI_PAGE(base));
 	unmap_kernel_range_noflush(vaddr, PAGE_SIZE);
-	__flush_tlb_one(vaddr);
+	flush_tlb_kernel_range(vaddr, vaddr + PAGE_SIZE);
 }
 
 static void ghes_iounmap_irq(void __iomem *vaddr_ptr)
@@ -211,7 +211,7 @@ static void ghes_iounmap_irq(void __iomem *vaddr_ptr)
 
 	BUG_ON(vaddr != (unsigned long)GHES_IOREMAP_IRQ_PAGE(base));
 	unmap_kernel_range_noflush(vaddr, PAGE_SIZE);
-	__flush_tlb_one(vaddr);
+	flush_tlb_kernel_range(vaddr, vaddr + PAGE_SIZE);
 }
 
 static int ghes_estatus_pool_init(void)
