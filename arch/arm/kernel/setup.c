@@ -36,6 +36,7 @@
 #include <asm/cpu.h>
 #include <asm/cputype.h>
 #include <asm/elf.h>
+#include <asm/io.h>
 #include <asm/procinfo.h>
 #include <asm/psci.h>
 #include <asm/sections.h>
@@ -876,6 +877,10 @@ void __init setup_arch(char **cmdline_p)
 	*cmdline_p = cmd_line;
 
 	parse_early_param();
+
+#ifdef CONFIG_EARLY_IOREMAP
+	early_ioremap_init();
+#endif
 
 	sort(&meminfo.bank, meminfo.nr_banks, sizeof(meminfo.bank[0]), meminfo_cmp, NULL);
 	sanity_check_meminfo();

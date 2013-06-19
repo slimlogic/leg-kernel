@@ -26,6 +26,7 @@
 #include <linux/types.h>
 #include <asm/byteorder.h>
 #include <asm/memory.h>
+#include <asm/pgtable.h>
 #include <asm-generic/pci_iomap.h>
 
 /*
@@ -396,6 +397,22 @@ extern int devmem_is_allowed(unsigned long pfn);
  */
 extern void register_isa_ports(unsigned int mmio, unsigned int io,
 			       unsigned int io_shift);
+
+/*
+ * early_ioremap() and early_iounmap() are for temporary early boot-time
+ * mappings, before the real ioremap() is functional.
+ * A boot-time mapping is currently limited to at most 16 pages.
+ *
+ * This is all squashed by paging_init().
+ */
+extern void early_ioremap_init(void);
+extern void early_ioremap_reset(void);
+extern void __iomem *early_remap(resource_size_t phys_addr,
+				 unsigned long size, u32 prot);
+#define early_ioremap(x, y) early_remap(x, y, L_PTE_MT_DEV_NONSHARED)
+#define early_memremap(x, y) early_remap(x, y, L_PTE_MT_UNCACHED)
+
+extern void early_iounmap(void __iomem *addr, unsigned long size);
 
 #endif	/* __KERNEL__ */
 #endif	/* __ASM_ARM_IO_H */
