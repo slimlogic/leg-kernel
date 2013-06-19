@@ -1805,6 +1805,13 @@ config UACCESS_WITH_MEMCPY
 	  However, if the CPU data cache is using a write-allocate mode,
 	  this option is unlikely to provide any performance gain.
 
+config EARLY_IOREMAP
+	depends on MMU
+	bool "Provide early_ioremap() support for kernel initialization."
+	help
+	  Provides a mechanism for kernel initialisation code to temporarily
+	  map, in a highmem-agnostic way, memory pages in before paging_init().
+
 config SECCOMP
 	bool
 	prompt "Enable seccomp to safely compute untrusted bytecode"
