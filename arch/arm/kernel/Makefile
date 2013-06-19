@@ -96,4 +96,6 @@ obj-y				+= psci.o
 obj-$(CONFIG_SMP)		+= psci_smp.o
 endif
 
+obj-$(CONFIG_EFI)		+= efi.o efi_phys.o
+
 extra-y := $(head-y) vmlinux.lds
