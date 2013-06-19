@@ -873,6 +873,12 @@ static noinline void __init kernel_init_freeable(void)
 	smp_prepare_cpus(setup_max_cpus);
 
 	do_pre_smp_initcalls();
+
+#ifdef CONFIG_ARM
+	if (efi_enabled(EFI_BOOT))
+		efi_enter_virtual_mode();
+#endif
+
 	lockup_detector_init();
 
 	smp_init();
