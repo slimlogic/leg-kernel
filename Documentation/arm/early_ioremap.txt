@@ -1,0 +1,12 @@
+early_ioremap() and early_iounmap() rovide a mechanism for temporarily mapping
+in small blocks of memory, identified by their physical address, into the
+fixmap virtual address block before paging_init() has been called and more
+flexible mapping functions are available.
+
+Due to its direct method, it also gets around potential need for special
+handling of regions that end up in highmem.
+
+It supports up to 7 simultaneously mapped regions of up to 128KB each.
+All regions are mapped as non-shareable device memory.
+
+Specify 'early_ioremap_debug' on the kernel commandline for verbose output.
