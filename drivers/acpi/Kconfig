@@ -5,12 +5,16 @@
 config MAB
 	bool
 
+config ACPI_ARM
+	bool
+
 menuconfig ACPI
 	bool "ACPI (Advanced Configuration and Power Interface) Support"
 	depends on !IA64_HP_SIM
 	depends on ((IA64 || X86) && PCI) || (ARM || ARM64)
 	select PNP
 	select MAB if (ARM || ARM64)
+	select ACPI_ARM if (ARM || ARM64)
 	default y if !(ARM || ARM64)
 	help
 	  Advanced Configuration and Power Interface (ACPI) support for 
