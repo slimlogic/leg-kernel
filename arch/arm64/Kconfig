@@ -268,7 +268,11 @@ source "net/Kconfig"
 
 source "drivers/Kconfig"
 
+menu "Power management and ACPI options"
+
 source "drivers/acpi/Kconfig"
+
+endmenu
 
 source "fs/Kconfig"
 
