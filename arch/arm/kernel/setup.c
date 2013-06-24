@@ -30,6 +30,9 @@
 #include <linux/bug.h>
 #include <linux/compiler.h>
 #include <linux/sort.h>
+#ifdef CONFIG_ACPI
+#include <linux/acpi.h>
+#endif
 
 #include <asm/unified.h>
 #include <asm/cp15.h>
@@ -59,6 +62,18 @@
 
 #include "atags.h"
 
+/* BOZO: clears up the missing symbol during compile, but is this
+ * the right way to handle it?
+ */
+/*
+ * end_pfn only includes RAM, while max_pfn_mapped includes all e820 entries.
+ * The direct mapping extends to max_pfn_mapped, so that we can directly access
+ * apertures, ACPI and other tables without having to play with fixmaps.
+ */
+unsigned long max_low_pfn_mapped;
+unsigned long max_pfn_mapped;
+
+/* END BOZO */
 
 #if defined(CONFIG_FPE_NWFPE) || defined(CONFIG_FPE_FASTFPE)
 char fpe_type[8];
@@ -884,6 +899,14 @@ void __init setup_arch(char **cmdline_p)
 	paging_init(mdesc);
 	request_standard_resources(mdesc);
 
+#ifdef CONFIG_ACPI
+	/*
+	 * Parse the ACPI tables for possible boot-time configuration
+	 */
+	acpi_boot_table_init();
+	early_acpi_boot_init();
+#endif
+
 	if (mdesc->restart)
 		arm_pm_restart = mdesc->restart;
 
@@ -923,6 +946,10 @@ void __init setup_arch(char **cmdline_p)
 
 	if (mdesc->init_early)
 		mdesc->init_early();
+
+#ifdef CONFIG_ACPI
+	acpi_boot_init();
+#endif
 }
 
 
