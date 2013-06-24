@@ -2,11 +2,15 @@
 # ACPI Configuration
 #
 
+config ACPI_ARM
+	bool
+
 menuconfig ACPI
 	bool "ACPI (Advanced Configuration and Power Interface) Support"
 	depends on !IA64_HP_SIM
 	depends on ((IA64 || X86) && PCI) || (ARM || ARM64)
 	select PNP
+	select ACPI_ARM if (ARM || ARM64)
 	default y if !(ARM || ARM64)
 	help
 	  Advanced Configuration and Power Interface (ACPI) support for 
@@ -45,6 +49,7 @@ config ACPI_SLEEP
 config ACPI_PROCFS
 	bool "Deprecated /proc/acpi files"
 	depends on PROC_FS
+	depends on IA64 || X86
 	help
 	  For backwards compatibility, this option allows
 	  deprecated /proc/acpi/ files to exist, even when
@@ -58,6 +63,7 @@ config ACPI_PROCFS
 config ACPI_PROCFS_POWER
 	bool "Deprecated power /proc/acpi directories"
 	depends on PROC_FS
+	depends on IA64 || X86
 	help
 	  For backwards compatibility, this option allows
           deprecated power /proc/acpi/ directories to exist, even when
@@ -278,6 +284,7 @@ config ACPI_DEBUG
 config ACPI_PCI_SLOT
 	bool "PCI slot detection driver"
 	depends on SYSFS
+	depends on PCI
 	default n
 	help
 	  This driver creates entries in /sys/bus/pci/slots/ for all PCI
@@ -331,7 +338,7 @@ config ACPI_HOTPLUG_MEMORY
 
 config ACPI_SBS
 	tristate "Smart Battery System"
-	depends on X86
+	depends on X86 || ARM || ARM64
 	select POWER_SUPPLY
 	help
 	  This driver supports the Smart Battery System, another

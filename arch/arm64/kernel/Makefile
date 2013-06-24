@@ -28,5 +28,3 @@ extra-y					:= $(head-y) vmlinux.lds
 $(call objectify,$(arm64-obj-y)): $(obj)/vdso/vdso-offsets.h
 $(obj)/vdso/vdso-offsets.h: $(obj)/vdso
 
-obj-$(CONFIG_ACPI)			+= acpi/
-
