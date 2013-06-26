@@ -10,6 +10,7 @@
 
 #include <linux/percpu.h>
 #include <linux/cpu.h>
+#include <linux/topology.h>
 
 struct cpuinfo_arm {
 	struct cpu	cpu;
