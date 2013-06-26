@@ -276,20 +276,19 @@ void acpi_find_arm_root_pointer(acpi_physical_address *pa)
 	*pa = (acpi_physical_address)address;
 
 	rp = (struct acpi_table_rsdp *)address;
-	printk(KERN_DEBUG "(I) ACPI rsdp rp: 0x%08lx\n", (long unsigned int)rp);
+	pr_debug("ACPI rsdp rp: 0x%08lx\n", (long unsigned int)rp);
 	if (rp) {
-		printk(KERN_DEBUG "(I) ACPI rsdp content:\n");
-		printk(KERN_DEBUG "(I)    signature: %.8s\n", rp->signature);
-		printk(KERN_DEBUG "(I)    checksum: 0x%02x\n", rp->checksum);
-		printk(KERN_DEBUG "(I)    oem_id: %.6s\n", rp->oem_id);
-		printk(KERN_DEBUG "(I)    revision: %d\n", rp->revision);
-		printk(KERN_DEBUG "(I)    rsdt: 0x%08lX\n",
-				(long unsigned int)rp->rsdt_physical_address);
-		printk(KERN_DEBUG "(I)    length: %d\n", rp->length);
-		printk(KERN_DEBUG "(I)    xsdt: 0x%016llX\n",
-				(u64)rp->xsdt_physical_address);
-		printk(KERN_DEBUG "(I)    x_checksum: 0x%02x\n",
-				rp->extended_checksum);
+		pr_debug("ACPI rsdp content:\n");
+		pr_debug("   signature: %.8s\n", rp->signature);
+		pr_debug("   checksum: 0x%02x\n", rp->checksum);
+		pr_debug("   oem_id: %.6s\n", rp->oem_id);
+		pr_debug("   revision: %d\n", rp->revision);
+		pr_debug("   rsdt: 0x%08lX\n",
+			 (long unsigned int)rp->rsdt_physical_address);
+		pr_debug("   length: %d\n", rp->length);
+		pr_debug("   xsdt: 0x%016llX\n",
+			 (u64)rp->xsdt_physical_address);
+		pr_debug("   x_checksum: 0x%02x\n", rp->extended_checksum);
 
 	*pa = (acpi_physical_address)(virt_to_phys(rp));
 	} else {
