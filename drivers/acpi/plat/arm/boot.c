@@ -566,8 +566,6 @@ void __init acpi_boot_table_init(void)
 	if (acpi_disabled)
 		return;
 
-	printk(KERN_DEBUG "acpi: enter acpi_boot_table_init\n");
-
 	/*
 	 * Fix up the addresses in the ACPI we've loaded
 	 * in.  The blob has them as offsets and we need
@@ -583,10 +581,7 @@ void __init acpi_boot_table_init(void)
 		return;
 	}
 
-	printk(KERN_INFO "(I) acpi_table_init call completed\n");
 	acpi_table_parse(ACPI_SIG_BOOT, acpi_parse_sbf);
-
-	printk(KERN_INFO "(I) exit acpi_boot_table_init\n");
 }
 
 int __init early_acpi_boot_init(void)
@@ -596,8 +591,6 @@ int __init early_acpi_boot_init(void)
 	 */
 	if (acpi_disabled)
 		return 1;
-
-	printk(KERN_INFO "enter early_acpi_boot_init\n");
 
 	/*
 	 * Process the Multiple APIC Description Table (MADT), if present
@@ -614,8 +607,6 @@ int __init acpi_boot_init(void)
 	 */
 	if (acpi_disabled)
 		return 1;
-
-	printk(KERN_INFO "enter acpi_boot_init\n");
 
 	acpi_table_parse(ACPI_SIG_BOOT, acpi_parse_sbf);
 
