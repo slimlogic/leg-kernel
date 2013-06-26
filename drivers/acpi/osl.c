@@ -266,7 +266,7 @@ void acpi_find_arm_root_pointer(acpi_physical_address *pa)
 	struct acpi_table_rsdp *rp;
 
 	if (!acpi_arm_rsdp_info.phys_address && !acpi_arm_rsdp_info.size) {
-		printk(KERN_ERR "(E) ACPI: failed to find rsdp info\n");
+		pr_err("failed to find rsdp info\n");
 		*pa = (acpi_physical_address)NULL;
 		return;
 	}
@@ -293,7 +293,7 @@ void acpi_find_arm_root_pointer(acpi_physical_address *pa)
 
 	*pa = (acpi_physical_address)(virt_to_phys(rp));
 	} else {
-		printk(KERN_ERR "(E) ACPI missing rsdp info\n");
+		pr_err("ACPI missing rsdp info\n");
 		*pa = (acpi_physical_address)NULL;
 	}
 
@@ -1314,7 +1314,7 @@ acpi_status acpi_os_wait_semaphore(acpi_handle handle, u32 units, u16 timeout)
 		jiffies = MAX_SCHEDULE_TIMEOUT;
 	else
 		jiffies = msecs_to_jiffies(timeout);
-	
+
 	ret = down_timeout(sem, jiffies);
 	if (ret)
 		status = AE_TIME;
