@@ -62,10 +62,4 @@ struct efi_uga_draw_protocol {
 	void *blt;
 };
 
-struct efi_simple_text_output_protocol {
-	void *reset;
-	void *output_string;
-	void *test_string;
-};
-
 #endif /* BOOT_COMPRESSED_EBOOT_H */

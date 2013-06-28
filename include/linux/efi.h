@@ -784,6 +784,14 @@ struct efivar_entry {
 	struct kobject kobj;
 };
 
+
+struct efi_simple_text_output_protocol {
+	void *reset;
+	void *output_string;
+	void *test_string;
+};
+
+
 extern struct list_head efivar_sysfs_list;
 
 static inline void
