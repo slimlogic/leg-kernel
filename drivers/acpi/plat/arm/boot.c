@@ -70,6 +70,7 @@ int acpi_sci_override_gsi __initdata;
 int acpi_skip_timer_override __initdata;
 int acpi_use_timer_override __initdata;
 int acpi_fix_pin2_polarity __initdata;
+static u64 acpi_lapic_addr __initdata;
 
 struct acpi_arm_root acpi_arm_rsdp_info;     /* info about RSDP from FDT */
 
@@ -115,6 +116,74 @@ void __init __acpi_unmap_table(char *map, unsigned long size)
 	 * pointless
 	 */
 	return;
+}
+
+static int __init acpi_parse_madt(struct acpi_table_header *table)
+{
+	struct acpi_table_madt *madt = NULL;
+
+	madt = (struct acpi_table_madt *)table;
+	if (!madt) {
+		pr_warn(PREFIX "Unable to map MADT\n");
+		return -ENODEV;
+	}
+
+	if (madt->address) {
+		acpi_lapic_addr = (u64) madt->address;
+
+		pr_debug(PREFIX "Local APIC address 0x%08x\n", madt->address);
+	}
+
+	return 0;
+}
+
+/* Local APIC = GIC cpu interface on ARM */
+static void __cpuinit acpi_register_lapic(int id, u8 enabled)
+{
+	return;
+}
+
+static int __init
+acpi_parse_gic(struct acpi_subtable_header *header, const unsigned long end)
+{
+	struct acpi_madt_generic_interrupt *processor = NULL;
+
+	processor = (struct acpi_madt_generic_interrupt *)header;
+
+	if (BAD_MADT_ENTRY(processor, end))
+		return -EINVAL;
+
+	acpi_table_print_madt_entry(header);
+
+	/*
+	 * We need to register disabled CPU as well to permit
+	 * counting disabled CPUs. This allows us to size
+	 * cpus_possible_map more accurately, to permit
+	 * to not preallocating memory for all NR_CPUS
+	 * when we use CPU hotplug.
+	 */
+	acpi_register_lapic(processor->gic_id,
+			    processor->flags & ACPI_MADT_ENABLED);
+
+	return 0;
+}
+
+static int __init
+acpi_parse_gic_distributor(struct acpi_subtable_header *header,
+				const unsigned long end)
+{
+	struct acpi_madt_generic_distributor *distributor = NULL;
+
+	distributor = (struct acpi_madt_generic_distributor *)header;
+
+	if (BAD_MADT_ENTRY(distributor, end))
+		return -EINVAL;
+
+	acpi_table_print_madt_entry(header);
+
+	/* TODO: handle with the base_address and irq_base for irq system */
+
+	return 0;
 }
 
 /*
@@ -227,9 +296,9 @@ void __init acpi_set_irq_model_pic(void)
 	acpi_ioapic = 0;
 }
 
-void __init acpi_set_irq_model_ioapic(void)
+void __init acpi_set_irq_model_gic(void)
 {
-	acpi_irq_model = ACPI_IRQ_MODEL_IOAPIC;
+	acpi_irq_model = ACPI_IRQ_MODEL_GIC;
 	__acpi_register_gsi = acpi_register_gsi_ioapic;
 	acpi_ioapic = 1;
 }
@@ -437,17 +506,108 @@ late_initcall(hpet_insert_resource);
 #define	acpi_parse_hpet	NULL
 #endif
 
+/* Local APIC = GIC cpu interface on ARM */
+static int __init acpi_parse_madt_lapic_entries(void)
+{
+	int count;
+
+	/*
+	 * do a partial walk of MADT to determine how many CPUs
+	 * we have including disabled CPUs
+	 */
+	count = acpi_table_parse_madt(ACPI_MADT_TYPE_GENERIC_INTERRUPT,
+				      acpi_parse_gic, MAX_LOCAL_APIC);
+
+	if (!count) {
+		pr_err(PREFIX "No LAPIC entries present\n");
+		/* TBD: Cleanup to allow fallback to MPS */
+		return -ENODEV;
+	} else if (count < 0) {
+		pr_err(PREFIX "Error parsing LAPIC entry\n");
+		/* TBD: Cleanup to allow fallback to MPS */
+		return count;
+	}
+
+	return 0;
+}
+
 static int __init acpi_parse_fadt(struct acpi_table_header *table)
 {
 	return 0;
 }
 
+/*
+ * Parse IOAPIC related entries in MADT
+ * returns 0 on success, < 0 on error
+ * IOAPIC = GIC distributor on ARM
+ */
+static int __init acpi_parse_madt_ioapic_entries(void)
+{
+	int count;
+
+	/*
+	 * ACPI interpreter is required to complete interrupt setup,
+	 * so if it is off, don't enumerate the io-apics with ACPI.
+	 * If MPS is present, it will handle them,
+	 * otherwise the system will stay in PIC mode
+	 */
+	if (acpi_disabled || acpi_noirq)
+		return -ENODEV;
+
+	count = acpi_table_parse_madt(ACPI_MADT_TYPE_GENERIC_DISTRIBUTOR,
+			acpi_parse_gic_distributor, MAX_IO_APICS);
+
+	if (!count) {
+		pr_err(PREFIX "No IOAPIC entries present\n");
+		return -ENODEV;
+	} else if (count < 0) {
+		pr_err(PREFIX "Error parsing IOAPIC entry\n");
+		return count;
+	}
+
+	return 0;
+}
+
 static void __init early_acpi_process_madt(void)
 {
+	/* should I introduce CONFIG_ARM_LOCAL_APIC like x86 does? */
+	acpi_table_parse(ACPI_SIG_MADT, acpi_parse_madt);
 }
 
 static void __init acpi_process_madt(void)
 {
+	/* should I introduce CONFIG_ARM_LOCAL_APIC like x86 does? */
+	int error;
+
+	if (!acpi_table_parse(ACPI_SIG_MADT, acpi_parse_madt)) {
+
+		/*
+		 * Parse MADT LAPIC entries
+		 */
+		error = acpi_parse_madt_lapic_entries();
+		if (!error) {
+			acpi_lapic = 1;
+
+			/*
+			 * Parse MADT IO-APIC entries
+			 */
+			error = acpi_parse_madt_ioapic_entries();
+			if (!error)
+				acpi_set_irq_model_gic();
+		}
+	}
+
+	/*
+	 * ACPI supports both logical (e.g. Hyper-Threading) and physical
+	 * processors, where MPS only supports physical.
+	 */
+	if (acpi_lapic && acpi_ioapic)
+		pr_info("Using ACPI (MADT) for SMP configuration "
+		       "information\n");
+	else if (acpi_lapic)
+		pr_info("Using ACPI for processor (LAPIC) "
+		       "configuration information\n");
+
 	return;
 }
 
@@ -719,4 +879,3 @@ int __acpi_release_global_lock(unsigned int *lock)
 	} while (unlikely (val != old));
 	return old & 0x1;
 }
-
