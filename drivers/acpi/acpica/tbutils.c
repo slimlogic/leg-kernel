@@ -445,7 +445,6 @@ acpi_tb_parse_root_table(acpi_physical_address rsdp_address)
 	acpi_status status;
 
 	ACPI_FUNCTION_TRACE(tb_parse_root_table);
-	printk(KERN_INFO "(I) entering acpi_tb_parse_root_table\n");
 
 	/*
 	 * Map the entire RSDP and extract the address of the RSDT or XSDT
