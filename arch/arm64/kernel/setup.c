@@ -301,7 +301,9 @@ void __init setup_arch(char **cmdline_p)
 #endif
 
 #ifdef CONFIG_ACPI
+	boot_cpu_apic_id = read_cpuid_mpidr() & MPIDR_HWID_BITMASK;
 	acpi_boot_init();
+	prefill_possible_map();
 #endif
 }
 
