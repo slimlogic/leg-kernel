@@ -20,6 +20,11 @@ struct cpuinfo_arm {
 #endif
 };
 
+#ifdef CONFIG_HOTPLUG_CPU
+extern int arch_register_cpu(int cpu);
+extern void arch_unregister_cpu(int cpu);
+#endif
+
 DECLARE_PER_CPU(struct cpuinfo_arm, cpu_data);
 
 #endif
