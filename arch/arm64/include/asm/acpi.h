@@ -34,6 +34,9 @@
 #define COMPILER_DEPENDENT_INT64	long long
 #define COMPILER_DEPENDENT_UINT64	unsigned long long
 
+#define MAX_LOCAL_APIC 256
+#define MAX_IO_APICS 64
+
 /*
  * Calling conventions:
  *

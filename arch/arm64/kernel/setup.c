@@ -299,6 +299,10 @@ void __init setup_arch(char **cmdline_p)
 	conswitchp = &dummy_con;
 #endif
 #endif
+
+#ifdef CONFIG_ACPI
+	acpi_boot_init();
+#endif
 }
 
 static int __init arm64_device_init(void)
