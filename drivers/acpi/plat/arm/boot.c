@@ -52,7 +52,7 @@ int acpi_disabled;
 EXPORT_SYMBOL(acpi_disabled);
 
 /* available_cpus here means enabled cpu in MADT */
-static int available_cpus __initdata;
+int available_cpus;
 
 /* Map logic cpu id to physical APIC id.
  * APIC = GIC cpu interface on ARM
@@ -463,10 +463,7 @@ static int __cpuinit _acpi_map_lsapic(acpi_handle handle, int *pcpu)
 		goto free_tmp_map;
 
 	cpumask_copy(tmp_map, cpu_present_mask);
-#ifdef CONFIG_X86
-	/* BOZO: ?? */
 	acpi_register_lapic(physid, ACPI_MADT_ENABLED);
-#endif
 
 	/*
 	 * If acpi_register_lapic successfully generates a new logical cpu
@@ -474,7 +471,7 @@ static int __cpuinit _acpi_map_lsapic(acpi_handle handle, int *pcpu)
 	 */
 	cpumask_andnot(new_map, cpu_present_mask, tmp_map);
 	if (cpumask_empty(new_map)) {
-		printk("Unable to map lapic to logical cpu number\n");
+		pr_err("Unable to map lapic to logical cpu number\n");
 		retval = -EINVAL;
 		goto free_new_map;
 	}
@@ -504,12 +501,9 @@ EXPORT_SYMBOL(acpi_map_lsapic);
 
 int acpi_unmap_lsapic(int cpu)
 {
-#ifdef CONFIG_X86
-	/* BOZO: ??? */
-	per_cpu(x86_cpu_to_apicid, cpu) = -1;
+	arm_cpu_to_apicid[cpu] = -1;
 	set_cpu_present(cpu, false);
-	num_processors--;
-#endif
+	available_cpus--;
 
 	return 0;
 }
