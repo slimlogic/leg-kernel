@@ -63,6 +63,9 @@ extern struct secondary_data secondary_data;
 extern void secondary_holding_pen(void);
 extern volatile unsigned long secondary_holding_pen_release;
 
+extern int __cpu_disable(void);
+extern void __cpu_die(unsigned int cpu);
+
 extern void arch_send_call_function_single_ipi(int cpu);
 extern void arch_send_call_function_ipi_mask(const struct cpumask *mask);
 
