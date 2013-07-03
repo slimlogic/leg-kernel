@@ -419,7 +419,9 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
 		if (err)
 			continue;
 
+#ifndef CONFIG_ACPI
 		set_cpu_present(cpu, true);
+#endif
 		max_cpus--;
 	}
 }

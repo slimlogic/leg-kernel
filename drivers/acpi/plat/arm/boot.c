@@ -51,6 +51,15 @@ u32 acpi_rsdt_forced;
 int acpi_disabled;
 EXPORT_SYMBOL(acpi_disabled);
 
+/* available_cpus here means enabled cpu in MADT */
+static int available_cpus __initdata;
+
+/* Map logic cpu id to physical APIC id.
+ * APIC = GIC cpu interface on ARM
+ */
+volatile int arm_cpu_to_apicid[NR_CPUS] = { [0 ... NR_CPUS-1] = -1 };
+int boot_cpu_apic_id = -1;
+
 #define BAD_MADT_ENTRY(entry, end) (					    \
 		(!entry) || (unsigned long)entry + sizeof(*entry) > end ||  \
 		((struct acpi_subtable_header *)entry)->length < sizeof(*entry))
@@ -131,7 +140,7 @@ static int __init acpi_parse_madt(struct acpi_table_header *table)
 	if (madt->address) {
 		acpi_lapic_addr = (u64) madt->address;
 
-		pr_debug(PREFIX "Local APIC address 0x%08x\n", madt->address);
+		pr_info(PREFIX "Local APIC address 0x%08x\n", madt->address);
 	}
 
 	return 0;
@@ -140,7 +149,35 @@ static int __init acpi_parse_madt(struct acpi_table_header *table)
 /* Local APIC = GIC cpu interface on ARM */
 static void __cpuinit acpi_register_lapic(int id, u8 enabled)
 {
-	return;
+	int cpu;
+
+	if (id >= MAX_LOCAL_APIC) {
+		pr_info(PREFIX "skipped apicid that is too big\n");
+		return;
+	}
+
+	total_cpus++;
+	if (!enabled)
+		return;
+
+	available_cpus++;
+
+	/* allocate a logic cpu id for the new comer */
+	if (boot_cpu_apic_id == id) {
+		/*
+		 * boot_cpu_init() already hold bit 0 in cpu_present_mask
+		 * for BSP, no need to allocte again.
+		 */
+		cpu = 0;
+	} else {
+		cpu = cpumask_next_zero(-1, cpu_present_mask);
+	}
+
+	/* map the logic cpu id to APIC id */
+	arm_cpu_to_apicid[cpu] = id;
+
+	set_cpu_present(cpu, true);
+	set_cpu_possible(cpu, true);
 }
 
 static int __init
@@ -301,6 +338,65 @@ void __init acpi_set_irq_model_gic(void)
 	acpi_irq_model = ACPI_IRQ_MODEL_GIC;
 	__acpi_register_gsi = acpi_register_gsi_ioapic;
 	acpi_ioapic = 1;
+}
+
+static int __initdata setup_possible_cpus = -1;
+static int __init _setup_possible_cpus(char *str)
+{
+	get_option(&str, &setup_possible_cpus);
+	return 0;
+}
+early_param("possible_cpus", _setup_possible_cpus);
+
+/*
+ * cpu_possible_mask should be static, it cannot change as cpu's
+ * are onlined, or offlined. The reason is per-cpu data-structures
+ * are allocated by some modules at init time, and dont expect to
+ * do this dynamically on cpu arrival/departure.
+ * cpu_present_mask on the other hand can change dynamically.
+ * In case when cpu_hotplug is not compiled, then we resort to current
+ * behaviour, which is cpu_possible == cpu_present.
+ * - Ashok Raj
+ *
+ * Three ways to find out the number of additional hotplug CPUs:
+ * - If the BIOS specified disabled CPUs in ACPI/mptables use that.
+ * - The user can overwrite it with possible_cpus=NUM
+ * - Otherwise don't reserve additional CPUs.
+ * We do this because additional CPUs waste a lot of memory.
+ * -AK
+ */
+__init void prefill_possible_map(void)
+{
+	int i;
+	int possible, disabled_cpus;
+
+	disabled_cpus = total_cpus - available_cpus;
+
+	if (setup_possible_cpus == -1) {
+		if (disabled_cpus > 0)
+			setup_possible_cpus = disabled_cpus;
+		else
+			setup_possible_cpus = 0;
+	}
+
+	possible = available_cpus + setup_possible_cpus;
+
+	pr_info("SMP: the system is limited to %d CPUs\n", nr_cpu_ids);
+
+	/*
+	 * On armv8 foundation model --cores=4 lets nr_cpu_ids=4, so we can't
+	 * get possible map correctly when more than 4 APIC entries in MADT.
+	 */
+	if (possible > nr_cpu_ids)
+		possible = nr_cpu_ids;
+
+	pr_info("SMP: Allowing %d CPUs, %d hotplug CPUs\n",
+		possible, max((possible - available_cpus), 0));
+
+	for (i = 0; i < possible; i++)
+		set_cpu_possible(i, true);
+	for (; i < NR_CPUS; i++)
+		set_cpu_possible(i, false);
 }
 
 /*
@@ -528,6 +624,18 @@ static int __init acpi_parse_madt_lapic_entries(void)
 		return count;
 	}
 
+#ifdef CONFIG_SMP
+	if (available_cpus == 0) {
+		pr_info(PREFIX "Found 0 CPUS; assuming 1\n");
+		/* FIXME: should be the real GIC id read from hardware */
+		arm_cpu_to_apicid[available_cpus] = 0;
+		available_cpus = 1;	/* We've got at least one of these */
+	}
+#endif
+	/* Make boot-up look pretty */
+	pr_info("%d CPUs available, %d CPUs total\n", available_cpus,
+	       total_cpus);
+
 	return 0;
 }
 
@@ -717,7 +825,6 @@ void __init acpi_arm_blob_relocate(void)
  * bit of fixup work on the offsets to turn them into kernel
  * virtual addresses so we can pass them on for later use.
  */
-
 void __init acpi_boot_table_init(void)
 {
 	/*
