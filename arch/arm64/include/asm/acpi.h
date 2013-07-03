@@ -82,6 +82,7 @@ extern int acpi_strict;
  */
 extern volatile int arm_cpu_to_apicid[NR_CPUS];
 extern int boot_cpu_apic_id;
+#define cpu_physical_id(cpu) arm_cpu_to_apicid[cpu]
 
 struct acpi_arm_root {
 	phys_addr_t phys_address;
