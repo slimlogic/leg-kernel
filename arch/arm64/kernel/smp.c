@@ -258,6 +258,27 @@ static const struct smp_enable_ops * __init smp_get_enable_ops(const char *name)
 	return NULL;
 }
 
+#ifdef CONFIG_HOTPLUG_CPU
+/*
+ * __cpu_disable runs on the processor to be shutdown.
+ */
+int __cpuinit __cpu_disable(void)
+{
+	pr_info("entered __cpu_disable(), assume always success\n");
+	return 0;
+}
+
+/*
+ * called on the thread which is asking for a CPU to be shutdown -
+ * waits until shutdown has completed, or it is timed out.
+ */
+void __cpuinit __cpu_die(unsigned int cpu)
+{
+	pr_info("entered __cpu_disable(), cpu %d will go away\n", cpu);
+	return;
+}
+#endif /* CONFIG_HOTPLUG_CPU */
+
 /*
  * Enumerate the possible CPU set from the device tree and build the
  * cpu logical map array containing MPIDR values related to logical
