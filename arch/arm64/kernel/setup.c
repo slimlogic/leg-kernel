@@ -56,7 +56,7 @@
 #include <asm/traps.h>
 #include <asm/memblock.h>
 #include <asm/psci.h>
-
+#include <asm/cpu.h>
 #ifdef CONFIG_ACPI
 #include <asm/acpi.h>
 #endif
@@ -315,16 +315,16 @@ static int __init arm64_device_init(void)
 }
 arch_initcall(arm64_device_init);
 
-static DEFINE_PER_CPU(struct cpu, cpu_data);
+DEFINE_PER_CPU(struct cpuinfo_arm, cpu_data);
 
 static int __init topology_init(void)
 {
 	int i;
 
 	for_each_possible_cpu(i) {
-		struct cpu *cpu = &per_cpu(cpu_data, i);
-		cpu->hotpluggable = 1;
-		register_cpu(cpu, i);
+		struct cpuinfo_arm *cpuinfo = &per_cpu(cpu_data, i);
+		cpuinfo->cpu.hotpluggable = 1;
+		register_cpu(&cpuinfo->cpu, i);
 	}
 
 	return 0;
