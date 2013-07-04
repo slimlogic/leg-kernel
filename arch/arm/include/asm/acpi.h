@@ -36,6 +36,9 @@
 #define COMPILER_DEPENDENT_INT64	long long
 #define COMPILER_DEPENDENT_UINT64	unsigned long long
 
+#define MAX_LOCAL_APIC 256
+#define MAX_IO_APICS 64
+
 /*
  * Calling conventions:
  *
@@ -96,6 +99,13 @@ extern int acpi_noirq;
 extern int acpi_pci_disabled;
 extern int acpi_strict;
 
+/* map logic cpu id to physical APIC id
+ * APIC = GIC cpu interface on ARM
+ */
+extern volatile int arm_cpu_to_apicid[NR_CPUS];
+extern int boot_cpu_apic_id;
+#define cpu_physical_id(cpu) arm_cpu_to_apicid[cpu]
+
 struct acpi_arm_root {
 	phys_addr_t phys_address;
 	unsigned long size;
@@ -104,6 +114,8 @@ extern struct acpi_arm_root acpi_arm_rsdp_info;
 
 /* Low-level suspend routine. */
 extern int acpi_suspend_lowlevel(void);
+
+extern void prefill_possible_map(void);
 
 /* Physical address to resume after wakeup */
 /* BOZO: was...
