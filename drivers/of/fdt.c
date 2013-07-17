@@ -730,20 +730,6 @@ int __init early_init_dt_scan_acpi(unsigned long node, const char *uname,
 	if (p != NULL && l > 0)
 		pinfo->size = be32_to_cpu(*p);
 
-	printk("acpi: start info is 0x%016llX, %lu bytes\n",
-			pinfo->phys_address, pinfo->size);
-
-	memblock_reserve(pinfo->phys_address, pinfo->size);
-
-	sig = phys_to_virt(pinfo->phys_address);
-
-	printk("acpi: sig is \"%c%c%c%c\"\n",
-			sig[0], sig[1], sig[2], sig[3]);
-	printk("acpi: info is %02x %02x %02x %02x\n",
-			sig[4], sig[5], sig[6], sig[7]);
-	printk("acpi: first table is \"%c%c%c%c\"\n",
-			sig[8], sig[9], sig[10], sig[11]);
-
 	return 1;
 }
 #endif
