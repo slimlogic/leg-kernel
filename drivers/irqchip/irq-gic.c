@@ -951,6 +951,10 @@ void __init gic_init_bases(unsigned int gic_nr, int irq_start,
 	if (WARN_ON(!gic->domain))
 		return;
 
+#ifdef CONFIG_ACPI
+	irq_set_default_host(gic->domain);
+#endif
+
 #ifdef CONFIG_SMP
 	set_smp_cross_call(gic_raise_softirq);
 	register_cpu_notifier(&gic_cpu_notifier);
