@@ -89,6 +89,10 @@ static const char version[] =
 
 #include <asm/io.h>
 
+#ifdef CONFIG_ACPI
+#include <linux/acpi.h>
+#endif
+
 #include "smc91x.h"
 
 #ifndef SMC_NOWAIT
@@ -2384,6 +2388,14 @@ static const struct of_device_id smc91x_match[] = {
 MODULE_DEVICE_TABLE(of, smc91x_match);
 #endif
 
+#ifdef CONFIG_ACPI
+static const struct acpi_device_id smc91x_acpi_match[] = {
+	{ "LINA0003", },
+	{ }
+};
+MODULE_DEVICE_TABLE(acpi, smc91x_acpi_match)
+#endif
+
 static struct dev_pm_ops smc_drv_pm_ops = {
 	.suspend	= smc_drv_suspend,
 	.resume		= smc_drv_resume,
@@ -2397,6 +2409,7 @@ static struct platform_driver smc_driver = {
 		.owner	= THIS_MODULE,
 		.pm	= &smc_drv_pm_ops,
 		.of_match_table = of_match_ptr(smc91x_match),
+		.acpi_match_table = ACPI_PTR(smc91x_acpi_match),
 	},
 };
 
