@@ -223,12 +223,15 @@
 				clocks = <&v2m_clk24mhz>, <&v2m_clk24mhz>;
 				clock-names = "uartclk", "apb_pclk";
 			};
-
+			/*
+			 * Removed for ACPI
+			 *
 			virtio_block@0130000 {
 				compatible = "virtio,mmio";
 				reg = <0x130000 0x1000>;
 				interrupts = <42>;
 			};
+			*/
 		};
 	};
 };
