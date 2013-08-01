@@ -713,82 +713,6 @@ static void __init acpi_process_madt(void)
 	return;
 }
 
-void set_checksum(u8 *start, int len, u8 *cksum)
-{
-	u8 newsum, oldsum;
-	u8 *p;
-
-	newsum = 0;
-	for (p = (u8 *)start; p < (u8 *)(start + len); p++)
-		newsum += *p;
-
-	oldsum = *cksum;
-	newsum = (u8)(newsum - oldsum);
-
-	*cksum = (u8)(0 - newsum);
-}
-
-void __init acpi_arm_blob_relocate(void)
-{
-	/*
-	 * Fortunately, there are only a few tables that need to
-	 * have their offsets converted to actual addresses.
-	 *
-	 * NB: all values in the blob are little-endian.
-	 */
-
-	struct acpi_table_rsdp *rp;
-	struct acpi_table_xsdt *xp;
-	struct acpi_table_fadt *fp;
-	phys_addr_t paddress;
-	void *vaddress;
-	u32 entries;
-	u32 ii;
-	u64 *tmp;
-
-	if (!acpi_arm_rsdp_info.phys_address && !acpi_arm_rsdp_info.size) {
-		printk(KERN_ERR "(E) ACPI: failed to find rsdp info\n");
-		return;
-	}
-
-	paddress = acpi_arm_rsdp_info.phys_address;
-	paddress += ACPI_BLOB_HEADER_SIZE;
-	vaddress = phys_to_virt(paddress);
-
-	/* fixups for the rsdp */
-	rp = (struct acpi_table_rsdp *)vaddress;
-	if (rp->rsdt_physical_address)
-		rp->rsdt_physical_address += paddress;
-	if (rp->xsdt_physical_address)
-		rp->xsdt_physical_address += paddress;
-	set_checksum((u8 *)rp, rp->length, &(rp->checksum));
-
-	/* fixups for the xsdt */
-	vaddress = phys_to_virt(rp->xsdt_physical_address);
-	xp = (struct acpi_table_xsdt *)vaddress;
-	entries = xp->header.length - sizeof (struct acpi_table_header);
-	entries /= 8;		/* length is in bytes */
-	tmp = (u64 *)(&(xp->table_offset_entry[0]));
-	for (ii = 0; ii < entries; ii++)
-		*tmp++ += paddress;
-	set_checksum((u8 *)xp, xp->header.length, &(xp->header.checksum));
-
-	/* fixups for the fadt */
-	vaddress = phys_to_virt(xp->table_offset_entry[0]);
-	fp = (struct acpi_table_fadt *)vaddress;
-	if (fp->facs)
-		fp->facs += paddress;
-	if (fp->dsdt)
-		fp->dsdt += paddress;
-	if (fp->Xfacs)
-		fp->Xfacs += paddress;
-	if (fp->Xdsdt)
-		fp->Xdsdt += paddress;
-
-	/* Always fix up the checksums since we've changed bits. */
-	set_checksum((u8 *)fp, fp->header.length, &(fp->header.checksum));
-}
-
 /*
  * ========== OLD COMMENTS FROM x86 =================================
  * acpi_boot_table_init() and acpi_boot_init()
@@ -826,13 +750,6 @@ void __init acpi_boot_table_init(void)
 	 */
 	if (acpi_disabled)
 		return;
-
-	/*
-	 * Fix up the addresses in the ACPI we've loaded
-	 * in.  The blob has them as offsets and we need
-	 * actual addresses.
-	 */
-	acpi_arm_blob_relocate();
 
 	/*
 	 * Initialize the ACPI boot-time table parser.
