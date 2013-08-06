@@ -39,6 +39,7 @@
 #include <asm/atomic.h>
 #include <asm/cacheflush.h>
 #include <asm/cputype.h>
+#include <asm/topology.h>
 #include <asm/mmu_context.h>
 #include <asm/pgtable.h>
 #include <asm/pgalloc.h>
@@ -198,6 +199,8 @@ asmlinkage void secondary_start_kernel(void)
 	 */
 	raw_spin_lock(&boot_lock);
 	raw_spin_unlock(&boot_lock);
+
+	store_cpu_topology(cpu);
 
 	/*
 	 * OK, now it's safe to let the boot CPU continue.  Wait for
@@ -407,6 +410,9 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
 {
 	int cpu, err;
 	unsigned int ncores = num_possible_cpus();
+
+	init_cpu_topology();
+	store_cpu_topology(smp_processor_id());
 
 	/*
 	 * are we trying to boot more cores than exist?
