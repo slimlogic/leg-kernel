@@ -163,11 +163,11 @@ fail:
 }
 
 /*
- * Allocate at the lowest possible address.
+ * Allocate at the lowest possible address, that is not below min.
  */
 static efi_status_t efi_low_alloc(efi_system_table_t *sys_table_arg,
 			      unsigned long size, unsigned long align,
-			      unsigned long *addr)
+			      unsigned long *addr, unsigned long min)
 {
 	unsigned long map_size, desc_size;
 	efi_memory_desc_t *map;
@@ -203,6 +203,9 @@ static efi_status_t efi_low_alloc(efi_system_table_t *sys_table_arg,
 		 */
 		if (start == 0x0)
 			start += 8;
+
+		if (start < min)
+			start = min;
 
 		start = round_up(start, align);
 		if ((start + size) > end)
