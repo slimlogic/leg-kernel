@@ -163,30 +163,21 @@ efi_stub_entry:
 		@ Don't care about fp, but need 64 bit alignment....
 		stmfd	sp!, {fp, lr}
 
-		@ allocate space on stack for return of new entry point of
-		@ zImage, as EFI stub may copy the kernel.  Pass address
-		@ of space in r2 - EFI stub will fill in the pointer.
-
-		sub	sp, sp, #8		@ we only need 4 bytes,
-						@ but keep stack 8 byte aligned.
-		mov	r2, sp
-		@ Pass our actual runtime start address in pointer data
-		adr	r11, LC0		@ address of LC0 at run time
-		ldr	r12, [r11, #0]		@ address of LC0 at link time
-
-		sub	r3, r11, r12		@ calculate the delta offset
-		str	r3, [r2, #0]
+		@ allocate space on stack for passing current zImage address
+		@ and for the EFI stub to return of new entry point of
+		@ zImage, as EFI stub may copy the kernel.  Pointer address
+		@ is passed in r2.  r0 and r1 are passed through from the
+		@ EFI firmware to efi_entry
+		adr	r3, start
+		str	r3, [sp, #-8]!
+		mov	r2, sp			@ pass pointer in r2
 		bl	efi_entry
+		ldr	r3, [sp], #8	@ get new zImage address from stack
 
-		@ get new zImage entry address from stack, put into r3
-		ldr	r3, [sp, #0]
-		add	sp, sp, #8  		@ restore stack
-
-		@ Check for error return from EFI stub
-		mov	r1, #EFI_STUB_ERROR
-		cmp	r0, r1
+		@ Check for error return from EFI stub.  r0 has FDT address
+		@ or EFI_STUB_ERROR error code.
+		cmp	r0, #EFI_STUB_ERROR
 		beq	efi_load_fail
-
 
 		@ Save return values of efi_entry
 		stmfd	sp!, {r0, r3}
@@ -209,9 +200,9 @@ efi_stub_entry:
 efi_load_fail:
 		@ Return EFI_LOAD_ERROR to EFI firmware on error.
 		@ Switch back to ARM mode for EFI is done based on
-		@ return address on stack
+		@ return address on stack in case we are in THUMB mode
 		ldr	r0, =0x80000001
-		ldmfd	sp!, {fp, pc}
+		ldmfd	sp!, {fp, pc}		@ put lr from stack into pc
 #endif
 
  THUMB(		.thumb			)
