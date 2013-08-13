@@ -162,7 +162,7 @@ static char *convert_cmdline_to_ascii(efi_system_table_t *sys_table,
 }
 
 
-static u32 update_fdt(efi_system_table_t *sys_table, void *orig_fdt, void *fdt,
+static int update_fdt(efi_system_table_t *sys_table, void *orig_fdt, void *fdt,
 		      int new_fdt_size, char *cmdline_ptr, u64 initrd_addr,
 		      u64 initrd_size, efi_memory_desc_t *memory_map,
 		      int map_size, int desc_size)
@@ -296,7 +296,7 @@ int efi_entry(void *handle, efi_system_table_t *sys_table,
 	cmdline_ptr = convert_cmdline_to_ascii(sys_table, image,
 					       &cmdline_size, 0xFFFFFFFF);
 	if (!cmdline_ptr) {
-		efi_printk(sys_table, PRINTK_PREFIX"ERROR: converting command line to ascii failed.\n");
+		efi_printk(sys_table, PRINTK_PREFIX"ERROR: Unable to allocate memory for command line.\n");
 		goto fail;
 	}
 
@@ -313,7 +313,7 @@ int efi_entry(void *handle, efi_system_table_t *sys_table,
 
 	err = fdt_check_header((void *)(unsigned long)fdt_addr);
 	if (err != 0) {
-		efi_printk(sys_table, PRINTK_PREFIX"ERROR: device tree header not valid\n");
+		efi_printk(sys_table, PRINTK_PREFIX"ERROR: Device tree header not valid\n");
 		goto fail_free_fdt;
 	}
 	if (fdt_totalsize((void *)(unsigned long)fdt_addr) > fdt_size) {
@@ -330,7 +330,7 @@ int efi_entry(void *handle, efi_system_table_t *sys_table,
 	if (region) {
 		dram_base = fdt64_to_cpu(region->base);
 	} else {
-		efi_printk(sys_table, PRINTK_PREFIX"ERROR: no 'memory' node in device tree.\n");
+		efi_printk(sys_table, PRINTK_PREFIX"ERROR: No 'memory' node in device tree.\n");
 		goto fail_free_fdt;
 	}
 
@@ -342,7 +342,7 @@ int efi_entry(void *handle, efi_system_table_t *sys_table,
 				EFI_ALLOCATE_ADDRESS, EFI_LOADER_DATA,
 				nr_pages, &kernel_reserve_addr);
 	if (status != EFI_SUCCESS) {
-		efi_printk(sys_table, PRINTK_PREFIX"ERROR: unable to allocate memory for uncompressed kernel.\n");
+		efi_printk(sys_table, PRINTK_PREFIX"ERROR: Unable to allocate memory for uncompressed kernel.\n");
 		goto fail_free_fdt;
 	}
 
@@ -368,30 +368,33 @@ int efi_entry(void *handle, efi_system_table_t *sys_table,
 	 * will allocate a bigger buffer if this ends up being too
 	 * small, so a rough guess is OK here.*/
 	new_fdt_size = fdt_size + cmdline_size + 0x200;
+	while (1) {
+		status = efi_high_alloc(sys_table, new_fdt_size, 0,
+					&new_fdt_addr,
+					dram_base + ZIMAGE_OFFSET_LIMIT);
+		if (status != EFI_SUCCESS) {
+			efi_printk(sys_table, PRINTK_PREFIX"ERROR: Unable to allocate memory for new device tree.\n");
+			goto fail_free_initrd;
+		}
 
-fdt_alloc_retry:
-	status = efi_high_alloc(sys_table, new_fdt_size, 0, &new_fdt_addr,
-			    dram_base + ZIMAGE_OFFSET_LIMIT);
-	if (status != EFI_SUCCESS) {
-		efi_printk(sys_table, PRINTK_PREFIX"ERROR: Unable to allocate memory for new device tree.\n");
-		goto fail_free_initrd;
-	}
+		/* Now that we have done our final memory allocation (and free)
+		 * we can get the memory map key needed
+		 * forexit_boot_services.*/
+		status = efi_get_memory_map(sys_table, &memory_map, &map_size,
+					    &desc_size, &mmap_key);
+		if (status != EFI_SUCCESS)
+			goto fail_free_new_fdt;
 
-	/* Now that we have done our final memory allocation (and free)
-	 * we can get the memory map key needed
-	 * forexit_boot_services.*/
-	status = efi_get_memory_map(sys_table, &memory_map, &map_size,
-				    &desc_size, &mmap_key);
-	if (status != EFI_SUCCESS)
-		goto fail_free_new_fdt;
+		status = update_fdt(sys_table,
+				    fdt, (void *)new_fdt_addr, new_fdt_size,
+				    cmdline_ptr,
+				    initrd_addr, initrd_size,
+				    memory_map, map_size, desc_size);
 
-	status = update_fdt(sys_table,
-			    fdt, (void *)new_fdt_addr, new_fdt_size,
-			    cmdline_ptr,
-			    initrd_addr, initrd_size,
-			    memory_map, map_size, desc_size);
+		/* Succeeding the first time is the expected case. */
+		if (status == EFI_SUCCESS)
+			break;
 
-	if (status != EFI_SUCCESS) {
 		if (status == EFI_BUFFER_TOO_SMALL) {
 			/* We need to allocate more space for the new
 			 * device tree, so free existing buffer that is
@@ -402,10 +405,12 @@ fdt_alloc_retry:
 			efi_call_phys1(sys_table->boottime->free_pool,
 				       memory_map);
 			new_fdt_size += new_fdt_size/4;
-			goto fdt_alloc_retry;
 		}
-		efi_printk(sys_table, PRINTK_PREFIX"ERROR: Unable to constuct new device tree.\n");
-		goto fail_free_initrd;
+		else
+		{
+			efi_printk(sys_table, PRINTK_PREFIX"ERROR: Unable to constuct new device tree.\n");
+			goto fail_free_mmap;
+		}
 	}
 
 	/* Now we are ready to exit_boot_services.*/
@@ -413,7 +418,7 @@ fdt_alloc_retry:
 				handle, mmap_key);
 
 	if (status != EFI_SUCCESS) {
-		efi_printk(sys_table, PRINTK_PREFIX"ERROR: exit boot services failed.\n");
+		efi_printk(sys_table, PRINTK_PREFIX"ERROR: Exit boot services failed.\n");
 		goto fail_free_mmap;
 	}
 
