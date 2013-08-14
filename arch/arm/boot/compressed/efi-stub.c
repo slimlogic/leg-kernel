@@ -436,7 +436,7 @@ fail_free_zimage:
 	efi_free(sys_table, zimage_size, *zimage_addr);
 
 fail_free_kernel_reserve:
-	efi_free(sys_table, kernel_reserve_addr, kernel_reserve_size);
+	efi_free(sys_table, kernel_reserve_size, kernel_reserve_addr);
 
 fail_free_fdt:
 	efi_free(sys_table, fdt_size, fdt_addr);
