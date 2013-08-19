@@ -1830,6 +1830,26 @@ config UACCESS_WITH_MEMCPY
 	  However, if the CPU data cache is using a write-allocate mode,
 	  this option is unlikely to provide any performance gain.
 
+config EARLY_IOREMAP
+	depends on MMU
+	bool "Provide early_ioremap() support for kernel initialization."
+	help
+	  Provides a mechanism for kernel initialisation code to temporarily
+	  map, in a highmem-agnostic way, memory pages in before paging_init().
+
+config EFI
+bool "UEFI runtime service support"
+	depends on OF
+	select UCS2_STRING
+	select EARLY_IOREMAP
+	---help---
+	  This enables the kernel to use UEFI runtime services that are
+	  available (such as the UEFI variable services).
+
+	  This option is only useful on systems that have UEFI firmware.
+	  However, even with this option, the resultant kernel should
+	  continue to boot on existing non-UEFI platforms.
+
 config SECCOMP
 	bool
 	prompt "Enable seccomp to safely compute untrusted bytecode"
@@ -2260,6 +2280,8 @@ endmenu
 source "net/Kconfig"
 
 source "drivers/Kconfig"
+
+source "drivers/firmware/Kconfig"
 
 source "fs/Kconfig"
 
