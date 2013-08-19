@@ -39,6 +39,7 @@
 #include <asm/atomic.h>
 #include <asm/cacheflush.h>
 #include <asm/cputype.h>
+#include <asm/topology.h>
 #include <asm/mmu_context.h>
 #include <asm/pgtable.h>
 #include <asm/pgalloc.h>
@@ -199,6 +200,8 @@ asmlinkage void secondary_start_kernel(void)
 	raw_spin_lock(&boot_lock);
 	raw_spin_unlock(&boot_lock);
 
+	store_cpu_topology(cpu);
+
 	/*
 	 * OK, now it's safe to let the boot CPU continue.  Wait for
 	 * the CPU migration code to notice that the CPU is online
@@ -257,6 +260,27 @@ static const struct smp_enable_ops * __init smp_get_enable_ops(const char *name)
 
 	return NULL;
 }
+
+#ifdef CONFIG_HOTPLUG_CPU
+/*
+ * __cpu_disable runs on the processor to be shutdown.
+ */
+int __cpuinit __cpu_disable(void)
+{
+	pr_info("entered __cpu_disable(), assume always success\n");
+	return 0;
+}
+
+/*
+ * called on the thread which is asking for a CPU to be shutdown -
+ * waits until shutdown has completed, or it is timed out.
+ */
+void __cpuinit __cpu_die(unsigned int cpu)
+{
+	pr_info("entered __cpu_disable(), cpu %d will go away\n", cpu);
+	return;
+}
+#endif /* CONFIG_HOTPLUG_CPU */
 
 /*
  * Enumerate the possible CPU set from the device tree and build the
@@ -387,6 +411,9 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
 	int cpu, err;
 	unsigned int ncores = num_possible_cpus();
 
+	init_cpu_topology();
+	store_cpu_topology(smp_processor_id());
+
 	/*
 	 * are we trying to boot more cores than exist?
 	 */
@@ -419,7 +446,9 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
 		if (err)
 			continue;
 
+#ifndef CONFIG_ACPI
 		set_cpu_present(cpu, true);
+#endif
 		max_cpus--;
 	}
 }

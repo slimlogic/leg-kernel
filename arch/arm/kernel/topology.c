@@ -24,6 +24,7 @@
 
 #include <asm/cputype.h>
 #include <asm/topology.h>
+#include <asm/cpu.h>
 
 /*
  * cpu power scale management
@@ -289,6 +290,17 @@ void store_cpu_topology(unsigned int cpuid)
 		cpu_topology[cpuid].socket_id, mpidr);
 }
 
+void arch_fix_phys_package_id(int num, u32 slot)
+{
+#ifdef CONFIG_SMP
+	struct cputopo_arm *cpuid_topo = &cpu_topology[num];
+
+	if (cpuid_topo->socket_id == -1)
+		cpuid_topo->socket_id = slot;
+#endif
+}
+EXPORT_SYMBOL_GPL(arch_fix_phys_package_id);
+
 /*
  * cluster_to_logical_mask - return cpu logical mask of CPUs in a cluster
  * @socket_id:		cluster HW identifier
@@ -340,3 +352,41 @@ void __init init_cpu_topology(void)
 
 	parse_dt_topology();
 }
+
+#ifdef CONFIG_HOTPLUG_CPU
+int __ref arch_register_cpu(int cpu)
+{
+	struct cpuinfo_arm *cpuinfo = &per_cpu(cpu_data, cpu);
+
+	/* BSP cann't be taken down on arm */
+	if (cpu)
+		cpuinfo->cpu.hotpluggable = 1;
+
+	return register_cpu(&cpuinfo->cpu, cpu);
+}
+EXPORT_SYMBOL(arch_register_cpu);
+
+void arch_unregister_cpu(int cpu)
+{
+	unregister_cpu(&per_cpu(cpu_data, cpu).cpu);
+}
+EXPORT_SYMBOL(arch_unregister_cpu);
+#else /* CONFIG_HOTPLUG_CPU */
+
+static int __init arch_register_cpu(int cpu)
+{
+	return register_cpu(&per_cpu(cpu_data, cpu).cpu, cpu);
+}
+#endif /* CONFIG_HOTPLUG_CPU */
+
+static int __init topology_init(void)
+{
+	int cpu;
+
+	for_each_present_cpu(cpu)
+		arch_register_cpu(cpu);
+
+	return 0;
+}
+subsys_initcall(topology_init);
+

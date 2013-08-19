@@ -242,6 +242,64 @@ static int __init setup_acpi_rsdp(char *arg)
 early_param("acpi_rsdp", setup_acpi_rsdp);
 #endif
 
+#if defined(CONFIG_ARM) || defined(CONFIG_ARM64)
+#include <asm/acpi.h>
+#include <acpi/actbl.h>
+
+void acpi_find_arm_root_pointer(acpi_physical_address *pa)
+{
+	/* BOZO: temporarily clunky.
+	 * What we do is, while using u-boot still, is use the values
+	 * that have already been retrieved from the FDT node
+	 * (/chosen/linux,acpi-start and /chosen/linux,acpi-len) which
+	 * contain the address of the first byte of the RSDP after it
+	 * has been loaded into RAM during u-boot (e.g., using something
+	 * like fatload mmc 0:2 42008000 my.blob), and the size of the
+	 * data in the complete ACPI blob.  We only do this since we have
+	 * to collaborate with FDT so we have to load FDT and the ACPI
+	 * tables in but only have one address we can use via bootm.
+	 * With UEFI, we should just be able to use the efi_enabled
+	 * branch below in acpi_os_get_root_pointer().
+	 */
+
+	void *address;
+	struct acpi_table_rsdp *rp;
+
+	if (!acpi_arm_rsdp_info.phys_address && !acpi_arm_rsdp_info.size) {
+		pr_err("failed to find rsdp info\n");
+		*pa = (acpi_physical_address)NULL;
+		return;
+	}
+
+	address = phys_to_virt(acpi_arm_rsdp_info.phys_address);
+	address += ACPI_BLOB_HEADER_SIZE;
+	*pa = (acpi_physical_address)address;
+
+	rp = (struct acpi_table_rsdp *)address;
+	pr_debug("ACPI rsdp rp: 0x%08lx\n", (long unsigned int)rp);
+	if (rp) {
+		pr_debug("ACPI rsdp content:\n");
+		pr_debug("   signature: %.8s\n", rp->signature);
+		pr_debug("   checksum: 0x%02x\n", rp->checksum);
+		pr_debug("   oem_id: %.6s\n", rp->oem_id);
+		pr_debug("   revision: %d\n", rp->revision);
+		pr_debug("   rsdt: 0x%08lX\n",
+			 (long unsigned int)rp->rsdt_physical_address);
+		pr_debug("   length: %d\n", rp->length);
+		pr_debug("   xsdt: 0x%016llX\n",
+			 (u64)rp->xsdt_physical_address);
+		pr_debug("   x_checksum: 0x%02x\n", rp->extended_checksum);
+
+	*pa = (acpi_physical_address)(virt_to_phys(rp));
+	} else {
+		pr_err("ACPI missing rsdp info\n");
+		*pa = (acpi_physical_address)NULL;
+	}
+
+	return;
+}
+#endif
+
 acpi_physical_address __init acpi_os_get_root_pointer(void)
 {
 #ifdef CONFIG_KEXEC
@@ -262,7 +320,11 @@ acpi_physical_address __init acpi_os_get_root_pointer(void)
 	} else {
 		acpi_physical_address pa = 0;
 
+#if defined(CONFIG_ARM) || defined(CONFIG_ARM64)
+		acpi_find_arm_root_pointer(&pa);
+#else
 		acpi_find_root_pointer(&pa);
+#endif
 		return pa;
 	}
 }
@@ -372,6 +434,7 @@ acpi_os_map_memory(acpi_physical_address phys, acpi_size size)
 		return __acpi_map_table((unsigned long)phys, size);
 
 	mutex_lock(&acpi_ioremap_lock);
+
 	/* Check if there's a suitable mapping already. */
 	map = acpi_map_lookup(phys, size);
 	if (map) {
@@ -1020,9 +1083,18 @@ acpi_os_read_pci_configuration(struct acpi_pci_id * pci_id, u32 reg,
 		return AE_ERROR;
 	}
 
+#ifdef CONFIG_X86
+	/*
+	 * BOZO: probably should not call this function at all
+	 * if there is no PCI...
+	 */
 	result = raw_pci_read(pci_id->segment, pci_id->bus,
 				PCI_DEVFN(pci_id->device, pci_id->function),
 				reg, size, &value32);
+#else
+	result = 0;
+	value32 = 0;
+#endif
 	*value = value32;
 
 	return (result ? AE_ERROR : AE_OK);
@@ -1048,9 +1120,14 @@ acpi_os_write_pci_configuration(struct acpi_pci_id * pci_id, u32 reg,
 		return AE_ERROR;
 	}
 
+#ifdef CONFIG_X86
+	/* BOZO: how do we handle not having PCI? */
 	result = raw_pci_write(pci_id->segment, pci_id->bus,
 				PCI_DEVFN(pci_id->device, pci_id->function),
 				reg, size, value);
+#else
+	result = 0;
+#endif
 
 	return (result ? AE_ERROR : AE_OK);
 }
@@ -1236,7 +1313,7 @@ acpi_status acpi_os_wait_semaphore(acpi_handle handle, u32 units, u16 timeout)
 		jiffies = MAX_SCHEDULE_TIMEOUT;
 	else
 		jiffies = msecs_to_jiffies(timeout);
-	
+
 	ret = down_timeout(sem, jiffies);
 	if (ret)
 		status = AE_TIME;

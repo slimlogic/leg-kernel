@@ -696,6 +696,42 @@ int __init early_init_dt_scan_chosen(unsigned long node, const char *uname,
 	return 1;
 }
 
+#if (defined(CONFIG_ARM64) || defined (CONFIG_ARM)) && defined(CONFIG_ACPI)
+#include <linux/memblock.h>
+#include <linux/acpi.h>
+#include <asm/acpi.h>
+#include <acpi/actbl.h>
+
+int __init early_init_dt_scan_acpi(unsigned long node, const char *uname,
+		int depth, void *data)
+{
+	unsigned long l;
+	unsigned int *p;
+	struct acpi_arm_root *pinfo;
+	unsigned char *sig;
+
+	pr_debug("search \"chosen\" for acpi info, depth: %d, uname: %s\n",
+			depth, uname);
+
+	if (depth != 1 || !data ||
+			(strcmp(uname, "chosen") != 0 && strcmp(uname, "chosen@0") != 0))
+		return 0;
+
+	/* Retrieve acpi,address line */
+	pinfo = (struct acpi_arm_root *)data;
+	p = of_get_flat_dt_prop(node, "linux,acpi-start", &l);
+	if (p != NULL && l > 0)
+		pinfo->phys_address = be32_to_cpu(*p);
+
+	/* Retrieve acpi,size line */
+	p = of_get_flat_dt_prop(node, "linux,acpi-len", &l);
+	if (p != NULL && l > 0)
+		pinfo->size = be32_to_cpu(*p);
+
+	return 1;
+}
+#endif
+
 /**
  * unflatten_device_tree - create tree of device_nodes from flat blob
  *
@@ -707,7 +743,7 @@ int __init early_init_dt_scan_chosen(unsigned long node, const char *uname,
 void __init unflatten_device_tree(void)
 {
 	__unflatten_device_tree(initial_boot_params, &of_allnodes,
-				early_init_dt_alloc_memory_arch);
+			early_init_dt_alloc_memory_arch);
 
 	/* Get pointer to "/chosen" and "/aliases" nodes for use everywhere */
 	of_alias_scan(early_init_dt_alloc_memory_arch);
