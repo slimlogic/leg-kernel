@@ -809,13 +809,13 @@ int __init early_init_dt_scan_acpi(unsigned long node, const char *uname,
 	/* Retrieve acpi,address line */
 	pinfo = (struct acpi_arm_root *)data;
 	p = of_get_flat_dt_prop(node, "linux,acpi-start", &l);
-	if (p != NULL && l > 0)
-		pinfo->phys_address = be32_to_cpu(*p);
+	if (p)
+		pinfo->phys_address = of_read_ulong(p, l/4);
 
 	/* Retrieve acpi,size line */
 	p = of_get_flat_dt_prop(node, "linux,acpi-len", &l);
-	if (p != NULL && l > 0)
-		pinfo->size = be32_to_cpu(*p);
+	if (p)
+		pinfo->size = of_read_ulong(p, l/4);
 
 	return 1;
 }
