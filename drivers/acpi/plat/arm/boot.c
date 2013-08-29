@@ -24,9 +24,6 @@
  * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
  */
 
-/*
- * BOZO: this needs to be done right....
- */
 #include <linux/init.h>
 #include <linux/acpi.h>
 #include <linux/acpi_pmtmr.h>
@@ -46,8 +43,12 @@
 #include <asm/smp.h>
 #include <asm/acpi.h>
 
-static int __initdata acpi_force;
+/*
+ * We never plan to use RSDT on arm/arm64 as its deprecated in spec but this
+ * variable is still required by the ACPI core
+ */
 u32 acpi_rsdt_forced;
+
 int acpi_disabled;
 EXPORT_SYMBOL(acpi_disabled);
 
@@ -221,56 +222,6 @@ acpi_parse_gic_distributor(struct acpi_subtable_header *header,
 	/* TODO: handle with the base_address and irq_base for irq system */
 
 	return 0;
-}
-
-/*
- * acpi_pic_sci_set_trigger()
- *
- * use ELCR to set PIC-mode trigger type for SCI
- *
- * If a PIC-mode SCI is not recognized or gives spurious IRQ7's
- * it may require Edge Trigger -- use "acpi_sci=edge"
- *
- * Port 0x4d0-4d1 are ECLR1 and ECLR2, the Edge/Level Control Registers
- * for the 8259 PIC.  bit[n] = 1 means irq[n] is Level, otherwise Edge.
- * ECLR1 is IRQs 0-7 (IRQ 0, 1, 2 must be 0)
- * ECLR2 is IRQs 8-15 (IRQ 8, 13 must be 0)
- */
-
-void __init acpi_pic_sci_set_trigger(unsigned int irq, u16 trigger)
-{
-	unsigned int mask = 1 << irq;
-	unsigned int old, new;
-
-	/* Real old ELCR mask */
-	old = inb(0x4d0) | (inb(0x4d1) << 8);
-
-	/*
-	 * If we use ACPI to set PCI IRQs, then we should clear ELCR
-	 * since we will set it correctly as we enable the PCI irq
-	 * routing.
-	 */
-	new = acpi_noirq ? old : 0;
-
-	/*
-	 * Update SCI information in the ELCR, it isn't in the PCI
-	 * routing tables..
-	 */
-	switch (trigger) {
-	case 1:		/* Edge - clear */
-		new &= ~mask;
-		break;
-	case 3:		/* Level - set */
-		new |= mask;
-		break;
-	}
-
-	if (old == new)
-		return;
-
-	printk(PREFIX "setting ELCR to %04x (from %04x)\n", new, old);
-	outb(new, 0x4d0);
-	outb(new >> 8, 0x4d1);
 }
 
 int acpi_gsi_to_irq(u32 gsi, unsigned int *irq)
@@ -812,69 +763,13 @@ static int __init parse_acpi(char *arg)
 	if (strcmp(arg, "off") == 0) {
 		disable_acpi();
 	}
-	/* acpi=force to over-ride black-list */
-	else if (strcmp(arg, "force") == 0) {
-		acpi_force = 1;
-		acpi_disabled = 0;
-	}
 	/* acpi=strict disables out-of-spec workarounds */
 	else if (strcmp(arg, "strict") == 0) {
 		acpi_strict = 1;
 	}
-	/* acpi=rsdt use RSDT instead of XSDT */
-	else if (strcmp(arg, "rsdt") == 0) {
-		acpi_rsdt_forced = 1;
-	}
-	/* "acpi=noirq" disables ACPI interrupt routing */
-	else if (strcmp(arg, "noirq") == 0) {
-		acpi_noirq_set();
-	}
-	/* "acpi=copy_dsdt" copys DSDT */
-	else if (strcmp(arg, "copy_dsdt") == 0) {
-		acpi_gbl_copy_dsdt_locally = 1;
-	} else {
-		/* Core will printk when we return error. */
-		return -EINVAL;
-	}
 	return 0;
 }
 early_param("acpi", parse_acpi);
-
-/* FIXME: Using pci= for an ACPI parameter is a travesty. */
-static int __init parse_pci(char *arg)
-{
-	if (arg && strcmp(arg, "noacpi") == 0)
-		acpi_disable_pci();
-	return 0;
-}
-early_param("pci", parse_pci);
-
-int __init acpi_mps_check(void)
-{
-	return 0;
-}
-
-static int __init setup_acpi_sci(char *s)
-{
-	if (!s)
-		return -EINVAL;
-	if (!strcmp(s, "edge"))
-		acpi_sci_flags =  ACPI_MADT_TRIGGER_EDGE |
-			(acpi_sci_flags & ~ACPI_MADT_TRIGGER_MASK);
-	else if (!strcmp(s, "level"))
-		acpi_sci_flags = ACPI_MADT_TRIGGER_LEVEL |
-			(acpi_sci_flags & ~ACPI_MADT_TRIGGER_MASK);
-	else if (!strcmp(s, "high"))
-		acpi_sci_flags = ACPI_MADT_POLARITY_ACTIVE_HIGH |
-			(acpi_sci_flags & ~ACPI_MADT_POLARITY_MASK);
-	else if (!strcmp(s, "low"))
-		acpi_sci_flags = ACPI_MADT_POLARITY_ACTIVE_LOW |
-			(acpi_sci_flags & ~ACPI_MADT_POLARITY_MASK);
-	else
-		return -EINVAL;
-	return 0;
-}
-early_param("acpi_sci", setup_acpi_sci);
 
 int __acpi_acquire_global_lock(unsigned int *lock)
 {
