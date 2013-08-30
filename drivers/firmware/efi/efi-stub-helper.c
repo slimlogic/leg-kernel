@@ -65,7 +65,7 @@ again:
 	 */
 	*map_size += sizeof(*m);
 	status = efi_call_phys3(sys_table_arg->boottime->allocate_pool,
-				EFI_LOADER_DATA, *map_size, (void **)&m);
+				EFI_ACPI_RECLAIM_MEMORY, *map_size, (void **)&m);
 	if (status != EFI_SUCCESS)
 		goto fail;
 
