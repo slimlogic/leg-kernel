@@ -1807,7 +1807,7 @@ config UACCESS_WITH_MEMCPY
 
 config EFI_STUB
 	bool "EFI stub support"
-	depends on EFI && !CPU_BIG_ENDIAN
+	depends on !CPU_BIG_ENDIAN
 	---help---
 	  This kernel feature allows a zImage to be loaded directly
 	  by EFI firmware without the use of a bootloader.  A PE/COFF

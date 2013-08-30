@@ -300,6 +300,20 @@ int efi_entry(void *handle, efi_system_table_t *sys_table,
 		goto fail;
 	}
 
+#if 1
+	/* HACK, so we can boot from boot manager.  If we are passed a real
+	 * command line, use it.
+	 *
+	 * TODO_RFRANZ - for debug only, not for real patch series
+	 */
+	if (!cmdline_ptr[0]) {
+		cmdline_ptr = "initrd=initrd dtb=dtb console=ttyAMA0 earlyprintk=keep";
+		efi_printk(sys_table, PRINTK_PREFIX"Booted from boot manager, forcing command line to: ");
+		efi_printk(sys_table, cmdline_ptr);
+		efi_printk(sys_table, "\n");
+	}
+#endif
+
 	/* We first load the device tree, as we need to get the base address of
 	 * DRAM from the device tree.  The zImage, device tree, and initrd
 	 * have address restrictions that are relative to the base of DRAM.
