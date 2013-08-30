@@ -122,7 +122,7 @@ static char *convert_cmdline_to_ascii(efi_system_table_t *sys_table,
 	u8 *s1 = NULL;
 	unsigned long cmdline_addr = 0;
 	int load_options_size = image->load_options_size / 2; /* ASCII */
-	void *options = (u16 *)image->load_options;
+	void *options = image->load_options;
 	int options_size = 0;
 	int status;
 	int i;
@@ -149,7 +149,7 @@ static char *convert_cmdline_to_ascii(efi_system_table_t *sys_table,
 	if (status != EFI_SUCCESS)
 		return NULL;
 
-	s1 = (u8 *)(unsigned long)cmdline_addr;
+	s1 = (u8 *)cmdline_addr;
 	s2 = (u16 *)options;
 
 	for (i = 0; i < options_size - 1; i++)
@@ -158,7 +158,7 @@ static char *convert_cmdline_to_ascii(efi_system_table_t *sys_table,
 	*s1 = '\0';
 
 	*cmd_line_len = options_size;
-	return (char *)(unsigned long)cmdline_addr;
+	return (char *)cmdline_addr;
 }
 
 
@@ -342,7 +342,9 @@ int efi_entry(void *handle, efi_system_table_t *sys_table,
 	}
 
 
-	/* Look up the base of DRAM from the device tree.*/
+        /* Look up the base of DRAM from the device tree. fdt_addr is
+         * a 64 bit value (efi_phys_addr_t), but EFI guarantees that
+         * all addresses are 32 bit for ARM32. */
 	fdt = (void *)(u32)fdt_addr;
 	node = fdt_subnode_offset(fdt, 0, "memory");
 	region = fdt_getprop(fdt, node, "reg", NULL);
