@@ -229,6 +229,11 @@ static int update_fdt(efi_system_table_t *sys_table, void *orig_fdt, void *fdt,
 	fdt_val = cpu_to_fdt32((unsigned long)memory_map);
 	status = fdt_setprop(fdt, node, "efi-runtime-mmap",
 			     &fdt_val, sizeof(fdt_val));
+
+        /* Stuff the whole memory map into FDT */
+	status = fdt_setprop(fdt, node, "efi-runtime-mmap-blob",
+			     memory_map, sizeof(map_size));
+
 	if (status)
 		goto fdt_set_fail;
 
