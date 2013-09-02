@@ -373,7 +373,7 @@ static int _acpi_map_lsapic(acpi_handle handle, int *pcpu)
 {
 	struct acpi_buffer buffer = { ACPI_ALLOCATE_BUFFER, NULL };
 	union acpi_object *obj;
-	struct acpi_madt_local_apic *lapic;
+	struct acpi_madt_generic_interrupt *lapic;
 	cpumask_var_t tmp_map, new_map;
 	u8 physid;
 	int cpu;
@@ -392,15 +392,15 @@ static int _acpi_map_lsapic(acpi_handle handle, int *pcpu)
 		return -EINVAL;
 	}
 
-	lapic = (struct acpi_madt_local_apic *)obj->buffer.pointer;
+	lapic = (struct acpi_madt_generic_interrupt *)obj->buffer.pointer;
 
-	if (lapic->header.type != ACPI_MADT_TYPE_LOCAL_APIC ||
-	    !(lapic->lapic_flags & ACPI_MADT_ENABLED)) {
+	if (lapic->header.type != ACPI_MADT_TYPE_GENERIC_INTERRUPT ||
+	    !(lapic->flags & ACPI_MADT_ENABLED)) {
 		kfree(buffer.pointer);
 		return -EINVAL;
 	}
 
-	physid = lapic->id;
+	physid = lapic->gic_id;
 
 	kfree(buffer.pointer);
 	buffer.length = ACPI_ALLOCATE_BUFFER;
