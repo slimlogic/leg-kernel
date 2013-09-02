@@ -148,7 +148,7 @@ static int __init acpi_parse_madt(struct acpi_table_header *table)
 }
 
 /* Local APIC = GIC cpu interface on ARM */
-static void __cpuinit acpi_register_lapic(int id, u8 enabled)
+static void acpi_register_lapic(int id, u8 enabled)
 {
 	int cpu;
 
@@ -316,7 +316,7 @@ early_param("possible_cpus", _setup_possible_cpus);
  * We do this because additional CPUs waste a lot of memory.
  * -AK
  */
-__init void prefill_possible_map(void)
+void __init prefill_possible_map(void)
 {
 	int i;
 	int possible, disabled_cpus;
@@ -356,7 +356,7 @@ __init void prefill_possible_map(void)
 #ifdef CONFIG_ACPI_HOTPLUG_CPU
 #include <acpi/processor.h>
 
-static void __cpuinit acpi_map_cpu2node(acpi_handle handle, int cpu, int physid)
+static void acpi_map_cpu2node(acpi_handle handle, int cpu, int physid)
 {
 #ifdef CONFIG_ACPI_NUMA
 	int nid;
@@ -369,7 +369,7 @@ static void __cpuinit acpi_map_cpu2node(acpi_handle handle, int cpu, int physid)
 #endif
 }
 
-static int __cpuinit _acpi_map_lsapic(acpi_handle handle, int *pcpu)
+static int _acpi_map_lsapic(acpi_handle handle, int *pcpu)
 {
 	struct acpi_buffer buffer = { ACPI_ALLOCATE_BUFFER, NULL };
 	union acpi_object *obj;
@@ -533,7 +533,7 @@ static int __init acpi_parse_hpet(struct acpi_table_header *table)
  * hpet_insert_resource inserts the HPET resources used into the resource
  * tree.
  */
-static __init int hpet_insert_resource(void)
+static int __init hpet_insert_resource(void)
 {
 	if (!hpet_res)
 		return 1;
