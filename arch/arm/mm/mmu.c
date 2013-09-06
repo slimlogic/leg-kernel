@@ -28,6 +28,7 @@
 #include <asm/highmem.h>
 #include <asm/system_info.h>
 #include <asm/traps.h>
+#include <asm/io.h>
 
 #include <asm/mach/arch.h>
 #include <asm/mach/map.h>
@@ -1363,4 +1364,7 @@ void __init paging_init(struct machine_desc *mdesc)
 
 	empty_zero_page = virt_to_page(zero_page);
 	__flush_dcache_page(NULL, empty_zero_page);
+#ifdef CONFIG_EARLY_IOREMAP
+	early_ioremap_reset();
+#endif
 }
