@@ -209,30 +209,26 @@ static int update_fdt(efi_system_table_t *sys_table, void *orig_fdt, void *fdt,
 	/* Add FDT entries for EFI runtime services in chosen node. */
 	node = fdt_subnode_offset(fdt, 0, "chosen");
 	fdt_val = cpu_to_fdt32((unsigned long)sys_table);
-	status = fdt_setprop(fdt, node, "efi-system-table",
+	status = fdt_setprop(fdt, node, "linux,efi-system-table",
 			     &fdt_val, sizeof(fdt_val));
 	if (status)
 		goto fdt_set_fail;
 
 	fdt_val = cpu_to_fdt32(desc_size);
-	status = fdt_setprop(fdt, node, "efi-mmap-desc-size",
+	status = fdt_setprop(fdt, node, "linux,efi-mmap-desc-size",
 			     &fdt_val, sizeof(fdt_val));
 	if (status)
 		goto fdt_set_fail;
 
 	fdt_val = cpu_to_fdt32(map_size);
-	status = fdt_setprop(fdt, node, "efi-runtime-mmap-size",
+	status = fdt_setprop(fdt, node, "linux,efi-runtime-mmap-size",
 			     &fdt_val, sizeof(fdt_val));
 	if (status)
 		goto fdt_set_fail;
 
-	fdt_val = cpu_to_fdt32((unsigned long)memory_map);
-	status = fdt_setprop(fdt, node, "efi-runtime-mmap",
-			     &fdt_val, sizeof(fdt_val));
-
         /* Stuff the whole memory map into FDT */
-	status = fdt_setprop(fdt, node, "efi-runtime-mmap-blob",
-			     memory_map, sizeof(map_size));
+	status = fdt_setprop(fdt, node, "linux,efi-mmap",
+			     memory_map, map_size);
 
 	if (status)
 		goto fdt_set_fail;
@@ -388,7 +384,7 @@ int efi_entry(void *handle, efi_system_table_t *sys_table,
 	/* Estimate size of new FDT, and allocate memory for it. We
 	 * will allocate a bigger buffer if this ends up being too
 	 * small, so a rough guess is OK here.*/
-	new_fdt_size = fdt_size + cmdline_size + 0x200;
+	new_fdt_size = fdt_size + cmdline_size + 0x200 + 0x1000;
 	while (1) {
 		status = efi_high_alloc(sys_table, new_fdt_size, 0,
 					&new_fdt_addr,
