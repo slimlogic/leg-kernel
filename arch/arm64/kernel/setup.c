@@ -41,6 +41,9 @@
 #include <linux/memblock.h>
 #include <linux/of_fdt.h>
 #include <linux/of_platform.h>
+#ifdef CONFIG_ACPI
+#include <linux/acpi.h>
+#endif
 
 #include <asm/cputype.h>
 #include <asm/elf.h>
@@ -53,6 +56,10 @@
 #include <asm/traps.h>
 #include <asm/memblock.h>
 #include <asm/psci.h>
+#include <asm/cpu.h>
+#ifdef CONFIG_ACPI
+#include <asm/acpi.h>
+#endif
 
 unsigned int processor_id;
 EXPORT_SYMBOL(processor_id);
@@ -166,6 +173,10 @@ static void __init setup_machine_fdt(phys_addr_t dt_phys)
 
 	/* Retrieve various information from the /chosen node */
 	of_scan_flat_dt(early_init_dt_scan_chosen, boot_command_line);
+#ifdef CONFIG_ACPI
+	/* Retrieve ACPI pointers from /chosen node */
+	of_scan_flat_dt(early_init_dt_scan_acpi, &acpi_arm_rsdp_info);
+#endif
 	/* Initialize {size,address}-cells info */
 	of_scan_flat_dt(early_init_dt_scan_root, NULL);
 	/* Setup memory, calling early_init_dt_add_memory_arch */
@@ -264,6 +275,14 @@ void __init setup_arch(char **cmdline_p)
 	paging_init();
 	request_standard_resources();
 
+#ifdef CONFIG_ACPI
+	/*
+	 * Parse the ACPI tables for possible boot-time configuration
+	 */
+	acpi_boot_table_init();
+	early_acpi_boot_init();
+#endif
+
 	unflatten_device_tree();
 
 	psci_init();
@@ -280,6 +299,12 @@ void __init setup_arch(char **cmdline_p)
 	conswitchp = &dummy_con;
 #endif
 #endif
+
+#ifdef CONFIG_ACPI
+	boot_cpu_apic_id = read_cpuid_mpidr() & MPIDR_HWID_BITMASK;
+	acpi_boot_init();
+	prefill_possible_map();
+#endif
 }
 
 static int __init arm64_device_init(void)
@@ -290,16 +315,16 @@ static int __init arm64_device_init(void)
 }
 arch_initcall(arm64_device_init);
 
-static DEFINE_PER_CPU(struct cpu, cpu_data);
+DEFINE_PER_CPU(struct cpuinfo_arm, cpu_data);
 
 static int __init topology_init(void)
 {
 	int i;
 
 	for_each_possible_cpu(i) {
-		struct cpu *cpu = &per_cpu(cpu_data, i);
-		cpu->hotpluggable = 1;
-		register_cpu(cpu, i);
+		struct cpuinfo_arm *cpuinfo = &per_cpu(cpu_data, i);
+		cpuinfo->cpu.hotpluggable = 1;
+		register_cpu(&cpuinfo->cpu, i);
 	}
 
 	return 0;
