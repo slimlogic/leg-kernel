@@ -2393,7 +2393,7 @@ static const struct acpi_device_id smc91x_acpi_match[] = {
 	{ "LINA0003", },
 	{ }
 };
-MODULE_DEVICE_TABLE(acpi, smc91x_acpi_match)
+MODULE_DEVICE_TABLE(acpi, smc91x_acpi_match);
 #endif
 
 static struct dev_pm_ops smc_drv_pm_ops = {
