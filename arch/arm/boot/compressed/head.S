@@ -10,6 +10,7 @@
  */
 #include <linux/linkage.h>
 #include <asm/assembler.h>
+#include "efi-stub.h"
 
 	.arch	armv7-a
 /*
@@ -120,21 +121,92 @@
  */
 		.align
 		.arm				@ Always enter in ARM state
+		.text
 start:
 		.type	start,#function
-		.rept	7
+#ifdef CONFIG_EFI_STUB
+		@ Magic MSDOS signature for PE/COFF + ADD opcode
+		@ the EFI stub only supports little endian, as the EFI functions
+		@ it invokes are little endian.
+		.word	0x62805a4d
+#else
+		mov	r0, r0
+#endif
+		.rept	5
 		mov	r0, r0
 		.endr
-   ARM(		mov	r0, r0		)
-   ARM(		b	1f		)
- THUMB(		adr	r12, BSYM(1f)	)
- THUMB(		bx	r12		)
+
+		adrl	r12, BSYM(zimage_continue)
+ ARM(		mov     pc, r12 )
+ THUMB(		bx	r12     )
+		@ zimage_continue will be in ARM or thumb mode as configured
 
 		.word	0x016f2818		@ Magic numbers to help the loader
 		.word	start			@ absolute load/run zImage address
 		.word	_edata			@ zImage end address
+
+#ifdef CONFIG_EFI_STUB
+		@ Portions of the MSDOS file header must be at offset
+		@ 0x3c from the start of the file.  All PE/COFF headers
+		@ are kept contiguous for simplicity.
+#include "efi-header.S"
+
+efi_stub_entry:
+		@ The EFI stub entry point is not at a fixed address, however
+		@ this address must be set in the PE/COFF header.
+		@ EFI entry point is in A32 mode, switch to T32 if configured.
+ THUMB(		adr	r12, BSYM(1f)	)
+ THUMB(		bx	r12		)
  THUMB(		.thumb			)
 1:
+		@ Save lr on stack for possible return to EFI firmware.
+		@ Don't care about fp, but need 64 bit alignment....
+		stmfd	sp!, {fp, lr}
+
+		@ allocate space on stack for passing current zImage address
+		@ and for the EFI stub to return of new entry point of
+		@ zImage, as EFI stub may copy the kernel.  Pointer address
+		@ is passed in r2.  r0 and r1 are passed through from the
+		@ EFI firmware to efi_entry
+		adr	r3, start
+		str	r3, [sp, #-8]!
+		mov	r2, sp			@ pass pointer in r2
+		bl	efi_entry
+		ldr	r3, [sp], #8	@ get new zImage address from stack
+
+		@ Check for error return from EFI stub.  r0 has FDT address
+		@ or EFI_STUB_ERROR error code.
+		cmp	r0, #EFI_STUB_ERROR
+		beq	efi_load_fail
+
+		@ Save return values of efi_entry
+		stmfd	sp!, {r0, r3}
+		bl	cache_clean_flush
+		bl	cache_off
+		ldmfd   sp!, {r0, r3}
+
+		@ Set parameters for booting zImage according to boot protocol
+		@ put FDT address in r2, it was returned by efi_entry()
+		@ r1 is FDT machine type, and r0 needs to be 0
+		mov	r2, r0
+		mov	r1, #0xFFFFFFFF
+		mov	r0, #0
+
+		@ Branch to (possibly) relocated zImage that is in r3
+		@ Make sure we are in A32 mode, as zImage requires
+ THUMB(		bx	r3		)
+ ARM(		mov	pc, r3		)
+
+efi_load_fail:
+		@ Return EFI_LOAD_ERROR to EFI firmware on error.
+		@ Switch back to ARM mode for EFI is done based on
+		@ return address on stack in case we are in THUMB mode
+		ldr	r0, =0x80000001
+		ldmfd	sp!, {fp, pc}		@ put lr from stack into pc
+#endif
+
+ THUMB(		.thumb			)
+zimage_continue:
 		mrs	r9, cpsr
 #ifdef CONFIG_ARM_VIRT_EXT
 		bl	__hyp_stub_install	@ get into SVC mode, reversibly
@@ -167,7 +239,6 @@ not_angel:
 		 * by the linker here, but it should preserve r7, r8, and r9.
 		 */
 
-		.text
 
 #ifdef CONFIG_AUTO_ZRELADDR
 		@ determine final kernel image address

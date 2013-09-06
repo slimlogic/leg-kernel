@@ -1935,6 +1935,17 @@ bool "UEFI runtime service support"
 	  However, even with this option, the resultant kernel should
 	  continue to boot on existing non-UEFI platforms.
 
+config EFI_STUB
+	bool "EFI stub support"
+	depends on !CPU_BIG_ENDIAN
+	---help---
+	  This kernel feature allows a zImage to be loaded directly
+	  by EFI firmware without the use of a bootloader.  A PE/COFF
+	  header is added to the zImage in a way that makes the binary
+	  both a Linux zImage and an PE/COFF executable that can be
+	  executed directly by EFI firmware.
+	  See Documentation/efi-stub.txt for more information.
+
 config SECCOMP
 	bool
 	prompt "Enable seccomp to safely compute untrusted bytecode"
