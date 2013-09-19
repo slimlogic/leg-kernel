@@ -55,7 +55,10 @@ static void sci_notify_client(char *acpi_name, u32 event)
 	 */
 	obj_desc = acpi_ns_get_attached_object(node);
 	if (obj_desc) {
-		if (obj_desc->common_notify.notify_list[0]) {
+		if (((event <= ACPI_MAX_SYS_NOTIFY) &&
+		    obj_desc->common_notify.notify_list[ACPI_SYSTEM_HANDLER_LIST]) ||
+		    (((event > ACPI_MAX_SYS_NOTIFY) &&
+		    obj_desc->common_notify.notify_list[ACPI_DEVICE_HANDLER_LIST]))) {
 			/*
 			 * Release the lock and queue the item for later
 			 * exectuion
