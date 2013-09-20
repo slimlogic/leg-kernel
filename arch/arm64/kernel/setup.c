@@ -267,6 +267,9 @@ void __init setup_arch(char **cmdline_p)
 
 	arm64_memblock_init();
 
+#ifdef CONFIG_ACPI
+	arm_acpi_reserve_memory();
+#endif
 	paging_init();
 	request_standard_resources();
 

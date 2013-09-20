@@ -754,6 +754,29 @@ int __init acpi_boot_init(void)
 	return 0;
 }
 
+/*
+ * make sure that the address passed for ACPI tables which is normall in
+ * system ram is removed from the kernel memory map
+ */
+void __init arm_acpi_reserve_memory()
+{
+	unsigned long section_offset;
+	unsigned long num_sections;
+	phys_addr_t addr = acpi_arm_rsdp_info.phys_address;
+	int size = acpi_arm_rsdp_info.size;
+
+	/* if ACPI tables were not passed in FDT then escape here */
+	if (!addr || !size)
+		return;
+
+	section_offset = addr - (addr & SECTION_MASK);
+	num_sections = size / SECTION_SIZE;
+	if (size % SECTION_SIZE)
+		num_sections++;
+
+	memblock_remove(addr - section_offset, num_sections * SECTION_SIZE);
+}
+
 static int __init parse_acpi(char *arg)
 {
 	if (!arg)
