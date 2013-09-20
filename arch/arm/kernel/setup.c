@@ -893,6 +893,9 @@ void __init setup_arch(char **cmdline_p)
 	acpi_boot_table_init();
 	early_acpi_boot_init();
 #endif
+#ifdef CONFIG_ACPI
+	arm_acpi_reserve_memory();
+#endif
 
 	if (mdesc->restart)
 		arm_pm_restart = mdesc->restart;
