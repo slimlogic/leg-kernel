@@ -112,6 +112,8 @@ struct acpi_arm_root {
 };
 extern struct acpi_arm_root acpi_arm_rsdp_info;
 
+void arm_acpi_reserve_memory(void);
+
 /* Low-level suspend routine. */
 extern int acpi_suspend_lowlevel(void);
 
