@@ -29,6 +29,7 @@
 #include <linux/platform_device.h>
 #include <linux/spinlock.h>
 #include <linux/uaccess.h>
+#include <linux/acpi.h>
 
 #include <asm/cputype.h>
 #include <asm/irq.h>
@@ -1281,6 +1282,13 @@ static struct of_device_id armpmu_of_device_ids[] = {
 	{},
 };
 
+#ifdef CONFIG_ACPI
+static const struct acpi_device_id armpmu_acpi_match[] = {
+	{ "LNRO0007", },
+	{},
+};
+#endif
+
 static int armpmu_device_probe(struct platform_device *pdev)
 {
 	if (!cpu_pmu)
@@ -1294,6 +1302,7 @@ static struct platform_driver armpmu_driver = {
 	.driver		= {
 		.name	= "arm-pmu",
 		.of_match_table = armpmu_of_device_ids,
+		.acpi_match_table = ACPI_PTR(armpmu_acpi_match),
 	},
 	.probe		= armpmu_device_probe,
 };
