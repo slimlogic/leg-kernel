@@ -502,6 +502,11 @@
 		};
 	};
 
+	usb@12110000 {
+		hub-reset = <&gpx3 5 1>;
+		hub-connect = <&gpd1 7 1>;
+	};
+
 	fixed-rate-clocks {
 		xxti {
 			compatible = "samsung,clock-xxti";
