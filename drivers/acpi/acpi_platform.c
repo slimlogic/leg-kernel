@@ -33,6 +33,7 @@ static const struct acpi_device_id acpi_platform_device_ids[] = {
 	/* arm64 platform devices */
 	{ "LINA0003" },
 	{ "LINA0005" },
+	{ "LINA0007" },
 
 	{ }
 };
