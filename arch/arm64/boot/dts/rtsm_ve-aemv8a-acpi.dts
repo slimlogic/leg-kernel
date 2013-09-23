@@ -88,6 +88,9 @@
 		clock-frequency = <100000000>;
 	};
 
+	/*
+	 * Removed for ACPI
+	 *
 	pmu {
 		compatible = "arm,armv8-pmuv3";
 		interrupts = <0 60 4>,
@@ -95,6 +98,7 @@
 			     <0 62 4>,
 			     <0 63 4>;
 	};
+	*/
 
 	smb {
 		compatible = "simple-bus";
