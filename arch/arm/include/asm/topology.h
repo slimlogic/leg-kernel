@@ -35,6 +35,7 @@ static inline void init_cpu_topology(void) { }
 static inline void store_cpu_topology(unsigned int cpuid) { }
 static inline int cluster_to_logical_mask(unsigned int socket_id,
 	cpumask_t *cluster_mask) { return -EINVAL; }
+static inline void arch_fix_phys_package_id(int num, u32 slot) { };
 
 #endif
 
