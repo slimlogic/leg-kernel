@@ -107,7 +107,7 @@ static unsigned int gsi_to_irq(unsigned int gsi)
  * BOZO: is it reasonable to just reserve the memory space?  Or are there
  * other restrictions needed?  Or does it need copying to some other place?
  */
-char *__init __acpi_map_table(unsigned long phys, unsigned long size)
+char *__init __acpi_map_table(phys_addr_t phys, unsigned long size)
 {
 	if (!phys || !size)
 		return NULL;
