@@ -237,6 +237,12 @@ extern void __iounmap(volatile void __iomem *addr);
 #define ioremap_cache(addr, size)	__ioremap((addr), (size), __pgprot(PROT_NORMAL))
 #define iounmap				__iounmap
 
+extern void __iomem *early_ioremap(resource_size_t phys_addr,
+				   unsigned long size);
+extern void __iomem *early_memremap(resource_size_t phys_addr,
+				    unsigned long size);
+extern void early_iounmap(void __iomem *addr, unsigned long size);
+
 #define PROT_SECT_DEFAULT	(PMD_TYPE_SECT | PMD_SECT_AF)
 #define PROT_SECT_DEVICE_nGnRE	(PROT_SECT_DEFAULT | PTE_PXN | PTE_UXN | PMD_ATTRINDX(MT_DEVICE_nGnRE))
 
