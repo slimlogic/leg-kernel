@@ -103,17 +103,12 @@ static unsigned int gsi_to_irq(unsigned int gsi)
 	return irq;
 }
 
-/*
- * BOZO: is it reasonable to just reserve the memory space?  Or are there
- * other restrictions needed?  Or does it need copying to some other place?
- */
 char *__init __acpi_map_table(phys_addr_t phys, unsigned long size)
 {
 	if (!phys || !size)
 		return NULL;
 
-	/* we're already in memory so we cannot io_remap the entry */
-	return phys_to_virt(phys);
+	return early_memremap(phys, size);
 }
 
 void __init __acpi_unmap_table(char *map, unsigned long size)
@@ -121,10 +116,7 @@ void __init __acpi_unmap_table(char *map, unsigned long size)
 	if (!map || !size)
 		return;
 
-	/* we're already in memory so we cannot io_remap the entry;
-	 * since we're not io_remap'ing, unmap'ing is especially
-	 * pointless
-	 */
+	early_iounmap(map, size);
 	return;
 }
 
