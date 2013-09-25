@@ -6,9 +6,7 @@
 void acpi_reboot(void)
 {
 	struct acpi_generic_address *rr;
-	struct pci_bus *bus0;
 	u8 reset_value;
-	unsigned int devfn;
 
 	if (acpi_disabled)
 		return;
@@ -31,7 +29,15 @@ void acpi_reboot(void)
 	/* The reset register can only exist in I/O, Memory or PCI config space
 	 * on a device on bus 0. */
 	switch (rr->space_id) {
+/*
+ * There are some rare cases in the ARM world with PCI is not one
+ * of the buses available to us, even though we use ACPI.
+ */
+#ifdef CONFIG_PCI
 	case ACPI_ADR_SPACE_PCI_CONFIG:
+		struct pci_bus *bus0;
+		unsigned int devfn;
+
 		/* The reset register can only live on bus 0. */
 		bus0 = pci_find_bus(0, 0);
 		if (!bus0)
@@ -44,6 +50,7 @@ void acpi_reboot(void)
 		pci_bus_write_config_byte(bus0, devfn,
 				(rr->address & 0xffff), reset_value);
 		break;
+#endif
 
 	case ACPI_ADR_SPACE_SYSTEM_MEMORY:
 	case ACPI_ADR_SPACE_SYSTEM_IO:
