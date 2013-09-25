@@ -294,7 +294,7 @@ void acpi_find_arm_root_pointer(acpi_physical_address *pa)
 			 (u64)rp->xsdt_physical_address);
 		pr_debug("   x_checksum: 0x%02x\n", rp->extended_checksum);
 
-	*pa = (acpi_physical_address)(virt_to_phys(rp));
+		*pa = (acpi_physical_address)(virt_to_phys(rp));
 	} else {
 		pr_err("ACPI missing rsdp info\n");
 		*pa = (acpi_physical_address)NULL;
