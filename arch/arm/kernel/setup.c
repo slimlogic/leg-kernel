@@ -888,8 +888,9 @@ void __init setup_arch(char **cmdline_p)
 	sanity_check_meminfo();
 	arm_memblock_init(&meminfo, mdesc);
 
-	paging_init(mdesc);
-	request_standard_resources(mdesc);
+#ifdef CONFIG_ACPI
+	arm_acpi_reserve_memory();
+#endif
 
 #ifdef CONFIG_ACPI
 	/*
@@ -897,10 +898,11 @@ void __init setup_arch(char **cmdline_p)
 	 */
 	acpi_boot_table_init();
 	early_acpi_boot_init();
+	acpi_boot_init();
 #endif
-#ifdef CONFIG_ACPI
-	arm_acpi_reserve_memory();
-#endif
+
+	paging_init(mdesc);
+	request_standard_resources(mdesc);
 
 	if (mdesc->restart)
 		arm_pm_restart = mdesc->restart;
@@ -941,10 +943,6 @@ void __init setup_arch(char **cmdline_p)
 
 	if (mdesc->init_early)
 		mdesc->init_early();
-
-#ifdef CONFIG_ACPI
-	acpi_boot_init();
-#endif
 }
 
 #ifdef CONFIG_HAVE_PROC_CPU
