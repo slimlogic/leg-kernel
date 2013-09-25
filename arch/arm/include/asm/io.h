@@ -415,7 +415,7 @@ extern void early_ioremap_reset(void);
 extern void __iomem *early_remap(resource_size_t phys_addr,
 				 unsigned long size, u32 prot);
 #define early_ioremap(x, y) early_remap(x, y, L_PTE_MT_DEV_NONSHARED)
-#define early_memremap(x, y) early_remap(x, y, L_PTE_MT_UNCACHED)
+#define early_memremap(x, y) early_remap(x, y, L_PTE_MT_WRITEALLOC)
 
 extern void early_iounmap(void __iomem *addr, unsigned long size);
 
