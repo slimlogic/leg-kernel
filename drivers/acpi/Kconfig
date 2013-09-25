@@ -4,6 +4,7 @@
 
 config ACPI_ARM
 	bool
+	select EARLY_IOREMAP
 
 menuconfig ACPI
 	bool "ACPI (Advanced Configuration and Power Interface) Support"
