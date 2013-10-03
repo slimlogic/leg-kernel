@@ -75,6 +75,57 @@ static int mfd_platform_add_cell(struct platform_device *pdev,
 	return 0;
 }
 
+#ifdef CONFIG_ACPI
+static acpi_status mfd_acpi_get_handle(acpi_handle handle, u32 level,
+				       void *context, void **return_value)
+{
+	acpi_handle tmp, parent_handle = context;
+	acpi_status status;
+
+	/*
+	 * The device we are after is a direct descendant of the MFD parent
+	 * device.
+	 */
+	status = acpi_get_parent(handle, &tmp);
+	if (ACPI_SUCCESS(status) && tmp == parent_handle) {
+		*(acpi_handle *)return_value = handle;
+		return AE_CTRL_TERMINATE;
+	}
+
+	return AE_OK;
+}
+
+static void mfd_acpi_add_device(const struct mfd_cell *cell,
+				struct platform_device *pdev)
+{
+	acpi_handle parent_handle;
+	acpi_handle handle = NULL;
+
+	parent_handle = ACPI_HANDLE(pdev->dev.parent);
+	if (!parent_handle)
+		return;
+
+	/*
+	 * MFD child device gets its ACPI handle either from the ACPI
+	 * device directly under the parent that matches the acpi_pnpid or
+	 * it will use the parent handle if there is no acpi_pnpid is
+	 * given.
+	 */
+	if (cell->acpi_pnpid)
+		acpi_get_devices(cell->acpi_pnpid, mfd_acpi_get_handle,
+				 parent_handle, (void **)&handle);
+	else
+		handle = parent_handle;
+
+	ACPI_HANDLE_SET(&pdev->dev, handle);
+}
+#else
+static inline void mfd_acpi_add_device(const struct mfd_cell *cell,
+				       struct platform_device *pdev)
+{
+}
+#endif
+
 static int mfd_add_device(struct device *parent, int id,
 			  const struct mfd_cell *cell,
 			  struct resource *mem_base,
@@ -107,6 +158,8 @@ static int mfd_add_device(struct device *parent, int id,
 			}
 		}
 	}
+
+	mfd_acpi_add_device(cell, pdev);
 
 	if (cell->pdata_size) {
 		ret = platform_device_add_data(pdev,

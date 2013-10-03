@@ -322,3 +322,30 @@ suitable to the gpiolib before passing them.
 
 In case of GpioInt resource an additional call to gpio_to_irq() must be
 done before calling request_irq().
+
+MFD devices
+~~~~~~~~~~~
+The MFD devices create platform devices from their children. For the
+children devices there needs to be an ACPI handle that they can use to
+refer parts of the ACPI namespace that relate to them. In Linux MFD
+subsystem we provide two ways:
+
+	o The children share the parent ACPI handle.
+	o You can specify the ACPI id of the device in mfd_cell
+	  description.
+
+For the first case, the MFD drivers don't need to do anything. The
+resulting child platform device will have its ACPI_HANDLE(&pdev->dev) set.
+
+If the ACPI namespace has a device that we can match using ACPI id the id
+should be set like:
+
+	static struct mfd_cell my_subdevice_cell = {
+		.name = "my_subdevice",
+		/* set the resources relative to the parent */
+		.acpi_pnpid = "XYZ0001",
+	};
+
+The ACPI id "XYZ0001" is then used to lookup an ACPI device directly under
+the MFD device and if found, that handle is assigned to the resulting child
+platform device.
