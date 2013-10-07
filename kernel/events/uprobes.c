@@ -248,6 +248,12 @@ static int verify_opcode(struct page *page, unsigned long vaddr, uprobe_opcode_t
  * have fixed length instructions.
  */
 
+void __weak arch_uprobe_write_opcode(struct arch_uprobe *auprobe, void *vaddr,
+				     uprobe_opcode_t opcode)
+{
+	memcpy(vaddr, &opcode, UPROBE_SWBP_INSN_SIZE);
+}
+
 /*
  * write_opcode - write the opcode at a given virtual address.
  * @mm: the probed process address space.
@@ -260,11 +266,12 @@ static int verify_opcode(struct page *page, unsigned long vaddr, uprobe_opcode_t
  * For mm @mm, write the opcode at @vaddr.
  * Return 0 (success) or a negative errno.
  */
-static int write_opcode(struct mm_struct *mm, unsigned long vaddr,
-			uprobe_opcode_t opcode)
+static int write_opcode(struct arch_uprobe *auprobe, struct mm_struct *mm,
+			unsigned long vaddr, uprobe_opcode_t opcode)
 {
 	struct page *old_page, *new_page;
 	struct vm_area_struct *vma;
+	void *vaddr_new;
 	int ret;
 
 retry:
@@ -285,7 +292,10 @@ retry:
 	__SetPageUptodate(new_page);
 
 	copy_highpage(new_page, old_page);
-	copy_to_page(new_page, vaddr, &opcode, UPROBE_SWBP_INSN_SIZE);
+	vaddr_new = kmap_atomic(new_page);
+	arch_uprobe_write_opcode(auprobe, vaddr_new + (vaddr & ~PAGE_MASK),
+				 opcode);
+	kunmap_atomic(vaddr_new);
 
 	ret = anon_vma_prepare(vma);
 	if (ret)
@@ -314,7 +324,7 @@ put_old:
  */
 int __weak set_swbp(struct arch_uprobe *auprobe, struct mm_struct *mm, unsigned long vaddr)
 {
-	return write_opcode(mm, vaddr, UPROBE_SWBP_INSN);
+	return write_opcode(auprobe, mm, vaddr, UPROBE_SWBP_INSN);
 }
 
 /**
@@ -329,7 +339,8 @@ int __weak set_swbp(struct arch_uprobe *auprobe, struct mm_struct *mm, unsigned 
 int __weak
 set_orig_insn(struct arch_uprobe *auprobe, struct mm_struct *mm, unsigned long vaddr)
 {
-	return write_opcode(mm, vaddr, *(uprobe_opcode_t *)auprobe->insn);
+	return write_opcode(auprobe, mm, vaddr,
+			    *(uprobe_opcode_t *)auprobe->insn);
 }
 
 static int match_uprobe(struct uprobe *l, struct uprobe *r)
