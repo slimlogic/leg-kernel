@@ -13,6 +13,7 @@
 #include <linux/module.h>
 
 #include "kprobes.h"
+#include "probes.h"
 
 
 /*

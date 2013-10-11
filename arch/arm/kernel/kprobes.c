@@ -29,6 +29,7 @@
 #include <asm/cacheflush.h>
 
 #include "kprobes.h"
+#include "probes.h"
 #include "patch.h"
 
 #define MIN_STACK_SIZE(addr) 				\

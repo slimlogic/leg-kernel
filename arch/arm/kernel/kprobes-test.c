@@ -205,6 +205,7 @@
 #include <asm/opcodes.h>
 
 #include "kprobes.h"
+#include "probes.h"
 #include "kprobes-test.h"
 
 
