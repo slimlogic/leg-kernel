@@ -358,6 +358,7 @@ static int test_kprobe(long (*func)(long, long))
 	return 0;
 }
 
+#ifndef CONFIG_THUMB2_KERNEL
 static void __kprobes jprobe_func(long r0, long r1)
 {
 	jprobe_func_called = test_func_instance;
@@ -401,6 +402,7 @@ static int test_jprobe(long (*func)(long, long))
 
 	return 0;
 }
+#endif
 
 static int __kprobes
 kretprobe_handler(struct kretprobe_instance *ri, struct pt_regs *regs)
@@ -456,10 +458,12 @@ static int run_api_tests(long (*func)(long, long))
 	if (ret < 0)
 		return ret;
 
+#ifndef CONFIG_THUMB2_KERNEL
 	pr_info("    jprobe\n");
 	ret = test_jprobe(func);
 	if (ret < 0)
 		return ret;
+#endif
 
 	pr_info("    kretprobe\n");
 	ret = test_kretprobe(func);
