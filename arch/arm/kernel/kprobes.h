@@ -29,7 +29,7 @@
 
 enum probes_insn __kprobes
 kprobe_decode_ldmstm(kprobe_opcode_t insn, struct arch_specific_insn *asi,
-		const struct decode_header *h);
+		struct decode_header *h);
 
 typedef enum probes_insn (kprobe_decode_insn_t)(kprobe_opcode_t,
 			struct arch_specific_insn *,

@@ -139,6 +139,9 @@ extern int __weak arch_uprobes_init(void);
 extern void __weak arch_uprobe_write_opcode(struct arch_uprobe *auprobe,
 					    void *vaddr,
 					    uprobe_opcode_t opcode);
+extern
+unsigned long arch_uretprobe_hijack_return_addr(unsigned long trampoline_vaddr,
+						       struct pt_regs *regs);
 #else /* !CONFIG_UPROBES */
 struct uprobes_state {
 };
