@@ -15,7 +15,6 @@
 #include <linux/kprobes.h>
 #include <asm/system_info.h>
 
-#include "kprobes.h"
 #include "probes.h"
 
 
@@ -75,7 +74,7 @@ void __init test_alu_write_pc_interworking(void)
 #endif /* !test_alu_write_pc_interworking */
 
 
-void __init arm_kprobe_decode_init(void)
+void __init arm_probes_decode_init(void)
 {
 	find_str_pc_offset();
 	test_load_write_pc_interworking();
@@ -166,7 +165,7 @@ static unsigned long __kprobes __check_al(unsigned long cpsr)
 	return true;
 }
 
-kprobe_check_cc * const kprobe_condition_checks[16] = {
+probes_check_cc * const probes_condition_checks[16] = {
 	&__check_eq, &__check_ne, &__check_cs, &__check_cc,
 	&__check_mi, &__check_pl, &__check_vs, &__check_vc,
 	&__check_hi, &__check_ls, &__check_ge, &__check_lt,
@@ -174,13 +173,17 @@ kprobe_check_cc * const kprobe_condition_checks[16] = {
 };
 
 
-void __kprobes kprobe_simulate_nop(struct kprobe *p, struct pt_regs *regs)
+void __kprobes probes_simulate_nop(probes_opcode_t opcode,
+	probes_opcode_t *addr, struct arch_specific_insn *asi,
+	struct pt_regs *regs)
 {
 }
 
-void __kprobes kprobe_emulate_none(struct kprobe *p, struct pt_regs *regs)
+void __kprobes probes_emulate_none(probes_opcode_t opcode,
+	probes_opcode_t *addr, struct arch_specific_insn *asi,
+	struct pt_regs *regs)
 {
-	p->ainsn.insn_fn();
+	asi->insn_fn();
 }
 
 /*
@@ -190,9 +193,9 @@ void __kprobes kprobe_emulate_none(struct kprobe *p, struct pt_regs *regs)
  * unconditional as the condition code will already be checked before any
  * emulation handler is called.
  */
-static kprobe_opcode_t __kprobes
-prepare_emulated_insn(kprobe_opcode_t insn, struct arch_specific_insn *asi,
-								bool thumb)
+static probes_opcode_t __kprobes
+prepare_emulated_insn(probes_opcode_t insn, struct arch_specific_insn *asi,
+			bool thumb)
 {
 #ifdef CONFIG_THUMB2_KERNEL
 	if (thumb) {
@@ -216,8 +219,8 @@ prepare_emulated_insn(kprobe_opcode_t insn, struct arch_specific_insn *asi,
  * prepare_emulated_insn
  */
 static void  __kprobes
-set_emulated_insn(kprobe_opcode_t insn, struct arch_specific_insn *asi,
-								bool thumb)
+set_emulated_insn(probes_opcode_t insn, struct arch_specific_insn *asi,
+			bool thumb)
 {
 #ifdef CONFIG_THUMB2_KERNEL
 	if (thumb) {
@@ -252,14 +255,14 @@ set_emulated_insn(kprobe_opcode_t insn, struct arch_specific_insn *asi,
  * non-zero value, the corresponding nibble in pinsn is validated and modified
  * according to the type.
  */
-static bool __kprobes decode_regs(kprobe_opcode_t *pinsn, u32 regs)
+static bool __kprobes decode_regs(probes_opcode_t *pinsn, u32 regs, bool modify)
 {
-	kprobe_opcode_t insn = *pinsn;
-	kprobe_opcode_t mask = 0xf; /* Start at least significant nibble */
+	probes_opcode_t insn = *pinsn;
+	probes_opcode_t mask = 0xf; /* Start at least significant nibble */
 
 	for (; regs != 0; regs >>= 4, mask <<= 4) {
 
-		kprobe_opcode_t new_bits = INSN_NEW_BITS;
+		probes_opcode_t new_bits = INSN_NEW_BITS;
 
 		switch (regs & 0xf) {
 
@@ -316,9 +319,16 @@ static bool __kprobes decode_regs(kprobe_opcode_t *pinsn, u32 regs)
 		/* Replace value of nibble with new register number... */
 		insn &= ~mask;
 		insn |= new_bits & mask;
+		if (modify) {
+			/* Replace value of nibble with new register number */
+			insn &= ~mask;
+			insn |= new_bits & mask;
+		}
 	}
 
-	*pinsn = insn;
+	if (modify)
+		*pinsn = insn;
+
 	return true;
 
 reject:
@@ -335,7 +345,7 @@ static const int decode_struct_sizes[NUM_DECODE_TYPES] = {
 };
 
 /*
- * kprobe_decode_insn operates on data tables in order to decode an ARM
+ * probes_decode_insn operates on data tables in order to decode an ARM
  * architecture instruction onto which a kprobe has been placed.
  *
  * These instruction decoding tables are a concatenation of entries each
@@ -378,15 +388,16 @@ static const int decode_struct_sizes[NUM_DECODE_TYPES] = {
  *
  */
 int __kprobes
-kprobe_decode_insn(kprobe_opcode_t insn, struct arch_specific_insn *asi,
+probes_decode_insn(probes_opcode_t insn, struct arch_specific_insn *asi,
 				const union decode_item *table, bool thumb,
-				const union decode_item *actions)
+				bool usermode, const union decode_item *actions)
 {
-	const struct decode_header *h = (struct decode_header *)table;
-	const struct decode_header *next;
+	struct decode_header *h = (struct decode_header *)table;
+	struct decode_header *next;
 	bool matched = false;
 
-	insn = prepare_emulated_insn(insn, asi, thumb);
+	if (!usermode)
+		insn = prepare_emulated_insn(insn, asi, thumb);
 
 	for (;; h = next) {
 		enum decode_type type = h->type_regs.bits & DECODE_TYPE_MASK;
@@ -401,7 +412,7 @@ kprobe_decode_insn(kprobe_opcode_t insn, struct arch_specific_insn *asi,
 		if (!matched && (insn & h->mask.bits) != h->value.bits)
 			continue;
 
-		if (!decode_regs(&insn, regs))
+		if (!decode_regs(&insn, regs, !usermode))
 			return INSN_REJECTED;
 
 		switch (type) {
@@ -414,7 +425,8 @@ kprobe_decode_insn(kprobe_opcode_t insn, struct arch_specific_insn *asi,
 
 		case DECODE_TYPE_CUSTOM: {
 			struct decode_custom *d = (struct decode_custom *)h;
-			return actions[d->decoder.bits].decoder(insn, asi, h);
+			return actions[d->decoder.bits].decoder(insn,
+					asi, h);
 		}
 
 		case DECODE_TYPE_SIMULATE: {
@@ -425,6 +437,11 @@ kprobe_decode_insn(kprobe_opcode_t insn, struct arch_specific_insn *asi,
 
 		case DECODE_TYPE_EMULATE: {
 			struct decode_emulate *d = (struct decode_emulate *)h;
+
+			if (usermode)
+				return actions[d->handler.bits].decoder(insn,
+								asi, h);
+
 			asi->insn_handler = actions[d->handler.bits].handler;
 			set_emulated_insn(insn, asi, thumb);
 			return INSN_GOOD;

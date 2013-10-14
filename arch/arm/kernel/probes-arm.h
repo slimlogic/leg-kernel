@@ -52,24 +52,21 @@ enum probes_arm_action {
 	PROBES_LDMSTM
 };
 
-void __kprobes simulate_bbl(struct kprobe *p, struct pt_regs *regs);
-void __kprobes simulate_blx1(struct kprobe *p, struct pt_regs *regs);
-void __kprobes simulate_blx2bx(struct kprobe *p, struct pt_regs *regs);
-void __kprobes simulate_mrs(struct kprobe *p, struct pt_regs *regs);
-void __kprobes simulate_mov_ipsp(struct kprobe *p, struct pt_regs *regs);
+void __kprobes simulate_bbl(probes_opcode_t opcode, probes_opcode_t *addr,
+	struct arch_specific_insn *asi, struct pt_regs *regs);
+void __kprobes simulate_blx1(probes_opcode_t opcode, probes_opcode_t *addr,
+	struct arch_specific_insn *asi, struct pt_regs *regs);
+void __kprobes simulate_blx2bx(probes_opcode_t opcode, probes_opcode_t *addr,
+	struct arch_specific_insn *asi, struct pt_regs *regs);
+void __kprobes simulate_mrs(probes_opcode_t opcode, probes_opcode_t *addr,
+	struct arch_specific_insn *asi, struct pt_regs *regs);
+void __kprobes simulate_mov_ipsp(probes_opcode_t opcode, probes_opcode_t *addr,
+	struct arch_specific_insn *asi, struct pt_regs *regs);
 
-void __kprobes emulate_ldrdstrd(struct kprobe *p, struct pt_regs *regs);
-void __kprobes emulate_ldr(struct kprobe *p, struct pt_regs *regs);
-void __kprobes emulate_str(struct kprobe *p, struct pt_regs *regs);
-void __kprobes emulate_rd12rn16rm0rs8_rwflags(struct kprobe *p,
-	struct pt_regs *regs);
-void __kprobes emulate_rd12rn16rm0_rwflags_nopc(struct kprobe *p,
-	struct pt_regs *regs);
-void __kprobes emulate_rd16rn12rm0rs8_rwflags_nopc(struct kprobe *p,
-	struct pt_regs *regs);
-void __kprobes emulate_rd12rm0_noflags_nopc(struct kprobe *p,
-	struct pt_regs *regs);
-void __kprobes emulate_rdlo12rdhi16rn0rm8_rwflags_nopc(struct kprobe *p,
-	struct pt_regs *regs);
+extern const union decode_item probes_decode_arm_table[];
+
+enum probes_insn arm_probes_decode_insn(probes_opcode_t,
+		struct arch_specific_insn *, bool usermode,
+		const union decode_item *actions);
 
 #endif

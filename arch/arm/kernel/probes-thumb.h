@@ -82,55 +82,14 @@ enum probes_t16_action {
 	PROBES_T16_BRANCH
 };
 
-void __kprobes t16_simulate_bxblx(struct kprobe *p, struct pt_regs *regs);
-void __kprobes t16_simulate_ldr_literal(struct kprobe *p, struct pt_regs *regs);
-void __kprobes t16_simulate_ldrstr_sp_relative(struct kprobe *p,
-		struct pt_regs *regs);
-void __kprobes t16_simulate_reladr(struct kprobe *p, struct pt_regs *regs);
-void __kprobes t16_simulate_add_sp_imm(struct kprobe *p, struct pt_regs *regs);
-void __kprobes t16_simulate_cbz(struct kprobe *p, struct pt_regs *regs);
-void __kprobes t16_simulate_it(struct kprobe *p, struct pt_regs *regs);
-void __kprobes t16_singlestep_it(struct kprobe *p, struct pt_regs *regs);
-enum kprobe_insn __kprobes t16_decode_it(kprobe_opcode_t insn,
-	struct arch_specific_insn *asi, const const struct decode_header *d);
-void __kprobes t16_simulate_cond_branch(struct kprobe *p, struct pt_regs *regs);
-enum kprobe_insn __kprobes t16_decode_cond_branch(kprobe_opcode_t insn,
-	struct arch_specific_insn *asi, const const struct decode_header *d);
-void __kprobes t16_simulate_branch(struct kprobe *p, struct pt_regs *regs);
-void __kprobes t16_emulate_loregs_rwflags(struct kprobe *p,
-	struct pt_regs *regs);
-void __kprobes t16_emulate_loregs_noitrwflags(struct kprobe *p,
-	struct pt_regs *regs);
-void __kprobes t16_emulate_hiregs(struct kprobe *p, struct pt_regs *regs);
-enum kprobe_insn __kprobes t16_decode_hiregs(kprobe_opcode_t insn,
-	struct arch_specific_insn *asi, const const struct decode_header *d);
-void __kprobes t16_emulate_push(struct kprobe *p, struct pt_regs *regs);
-enum kprobe_insn __kprobes t16_decode_push(kprobe_opcode_t insn,
-	struct arch_specific_insn *asi, const const struct decode_header *d);
-void __kprobes t16_emulate_pop_nopc(struct kprobe *p, struct pt_regs *regs);
-void __kprobes t16_emulate_pop_pc(struct kprobe *p, struct pt_regs *regs);
-enum kprobe_insn __kprobes t16_decode_pop(kprobe_opcode_t insn,
-	struct arch_specific_insn *asi, const struct decode_header *d);
+extern const union decode_item probes_decode_thumb32_table[];
+extern const union decode_item probes_decode_thumb16_table[];
 
-void __kprobes t32_simulate_table_branch(struct kprobe *p,
-	struct pt_regs *regs);
-void __kprobes t32_simulate_mrs(struct kprobe *p, struct pt_regs *regs);
-void __kprobes t32_simulate_cond_branch(struct kprobe *p, struct pt_regs *regs);
-enum kprobe_insn __kprobes t32_decode_cond_branch(kprobe_opcode_t insn,
-	struct arch_specific_insn *asi, const const struct decode_header *d);
-void __kprobes t32_simulate_branch(struct kprobe *p, struct pt_regs *regs);
-void __kprobes t32_simulate_ldr_literal(struct kprobe *p, struct pt_regs *regs);
-enum kprobe_insn __kprobes t32_decode_ldmstm(kprobe_opcode_t insn,
-	struct arch_specific_insn *asi, const const struct decode_header *d);
-void __kprobes t32_emulate_ldrdstrd(struct kprobe *p, struct pt_regs *regs);
-void __kprobes t32_emulate_ldrstr(struct kprobe *p, struct pt_regs *regs);
-void __kprobes t32_emulate_rd8rn16rm0_rwflags(struct kprobe *p,
-	struct pt_regs *regs);
-void __kprobes t32_emulate_rd8pc16_noflags(struct kprobe *p,
-	struct pt_regs *regs);
-void __kprobes t32_emulate_rd8rn16_noflags(struct kprobe *p,
-	struct pt_regs *regs);
-void __kprobes t32_emulate_rdlo12rdhi8rn16rm0_noflags(struct kprobe *p,
-	struct pt_regs *regs);
+enum probes_insn __kprobes
+thumb16_probes_decode_insn(probes_opcode_t insn, struct arch_specific_insn *asi,
+		   bool usermode, const union decode_item *actions);
+enum probes_insn __kprobes
+thumb32_probes_decode_insn(probes_opcode_t insn, struct arch_specific_insn *asi,
+		   bool usermode, const union decode_item *actions);
 
 #endif

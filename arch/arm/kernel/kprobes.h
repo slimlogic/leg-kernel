@@ -27,36 +27,25 @@
 #define KPROBE_THUMB16_BREAKPOINT_INSTRUCTION	0xde18
 #define KPROBE_THUMB32_BREAKPOINT_INSTRUCTION	0xf7f0a018
 
-struct decode_header;
+enum probes_insn __kprobes
+kprobe_decode_ldmstm(kprobe_opcode_t insn, struct arch_specific_insn *asi,
+		const struct decode_header *h);
 
-enum kprobe_insn {
-	INSN_REJECTED,
-	INSN_GOOD,
-	INSN_GOOD_NO_SLOT
-};
-
-typedef enum kprobe_insn (kprobe_decode_insn_t)(kprobe_opcode_t,
-		struct arch_specific_insn *,
-		const struct decode_header *actions);
+typedef enum probes_insn (kprobe_decode_insn_t)(kprobe_opcode_t,
+			struct arch_specific_insn *,
+			bool,
+			const union decode_item *);
 
 #ifdef CONFIG_THUMB2_KERNEL
 
-enum kprobe_insn thumb16_kprobe_decode_insn(kprobe_opcode_t,
-						struct arch_specific_insn *,
-						const struct decode_header *);
-enum kprobe_insn thumb32_kprobe_decode_insn(kprobe_opcode_t,
-						struct arch_specific_insn *,
-						const struct decode_header *);
+extern const union decode_item kprobes_t32_actions[];
+extern const union decode_item kprobes_t16_actions[];
 
 #else /* !CONFIG_THUMB2_KERNEL */
 
-enum kprobe_insn arm_kprobe_decode_insn(kprobe_opcode_t,
-					struct arch_specific_insn *,
-					const struct decode_header *);
+extern const union decode_item kprobes_arm_actions[];
 
 #endif
-
-void __init arm_kprobe_decode_init(void);
 
 
 #endif /* _ARM_KERNEL_KPROBES_H */

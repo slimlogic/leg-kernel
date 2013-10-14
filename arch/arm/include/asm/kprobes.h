@@ -19,6 +19,7 @@
 #include <linux/types.h>
 #include <linux/ptrace.h>
 #include <linux/percpu.h>
+#include <asm/probes.h>
 
 #define __ARCH_WANT_KPROBES_INSN_SLOT
 #define MAX_INSN_SIZE			2
@@ -28,9 +29,8 @@
 #define kretprobe_blacklist_size	0
 
 typedef u32 kprobe_opcode_t;
-struct kprobe;
-#include <asm/probes.h>
 
+struct kprobe;
 struct prev_kprobe {
 	struct kprobe *kp;
 	unsigned int status;
