@@ -273,16 +273,19 @@ void __init setup_arch(char **cmdline_p)
 #ifdef CONFIG_ACPI
 	arm_acpi_reserve_memory();
 #endif
-	paging_init();
-	request_standard_resources();
-
 #ifdef CONFIG_ACPI
 	/*
 	 * Parse the ACPI tables for possible boot-time configuration
 	 */
 	acpi_boot_table_init();
 	early_acpi_boot_init();
+	boot_cpu_apic_id = read_cpuid_mpidr() & MPIDR_HWID_BITMASK;
+	acpi_boot_init();
+	prefill_possible_map();
 #endif
+
+	paging_init();
+	request_standard_resources();
 
 	unflatten_device_tree();
 
@@ -299,12 +302,6 @@ void __init setup_arch(char **cmdline_p)
 #elif defined(CONFIG_DUMMY_CONSOLE)
 	conswitchp = &dummy_con;
 #endif
-#endif
-
-#ifdef CONFIG_ACPI
-	boot_cpu_apic_id = read_cpuid_mpidr() & MPIDR_HWID_BITMASK;
-	acpi_boot_init();
-	prefill_possible_map();
 #endif
 }
 
