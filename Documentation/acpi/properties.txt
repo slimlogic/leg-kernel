@@ -1,0 +1,224 @@
+ACPI device properties
+======================
+This document describes the format and interfaces of Device Tree style
+properties attached to ACPI devices.
+
+1. Introduction
+---------------
+In systems that use ACPI and want to take advantage of device specific
+properties, there needs to be a standard way to return and extract
+name-value pairs for a given ACPI device.
+
+An ACPI device that wants to export its properties must implement a
+method called _PRP that doesn't take arguments and returns a package of
+packages:
+
+	Method (_PRP, 0, NotSerialized)
+	{
+		Return (Package () {
+			Package () { "name1", <VALUE1> },
+			Package () { "name2", <VALUE2> },
+			...
+		})
+	}
+
+In each returned package, the first item must be string and it is called
+name. Type of value can be anything and depends on name.
+
+An example device where we might need properties is a GPIO keys device.
+In addition to the GpioIo/GpioInt resources the driver needs to know how
+to map each GpioIo resource to the corresponding Linux input event.
+
+To solve this we add following Device Tree properties to the ACPI device
+representing the GPIO keys device:
+
+	Method (_PRP, 0, NotSerialized)
+	{
+		Return (Package () {
+			Package() { "poll-interval", 100 },
+			Package() { "autorepeat" },
+			Package() { "linux,code", Package () { 105, 108, 103, 106 } },
+			Package() { "linux,input-type", Package () { 1, 1, 1, 1 } },
+		})
+	}
+
+2. Formal definition of properties
+----------------------------------
+Following chapters define currently supported properties. For these there
+exists an ACPI helper function that can be used to extract the property
+value in suitable format.
+
+2.1 Integer types
+-----------------
+In ACPI integer is always 64-bit. However, for drivers the full range is
+typically not needed thus we provide a set of functions which convert the
+returned 64-bit integer to a smaller Linux integer type.
+
+An integer property looks like this:
+
+	Package () { "poll-interval", 100 },
+	Package () { "i2c-sda-hold-time-ns", 300 },
+	Package () { "clock-frequency", 400000 },
+
+The following helper functions can be used to extract integer properties:
+
+	int acpi_dev_get_property_u64(struct acpi_device *adev,
+				      const char *name, u64 *value);
+	int acpi_dev_get_property_u32(struct acpi_device *adev,
+				      const char *name, u32 *value);
+	int acpi_dev_get_property_u16(struct acpi_device *adev,
+				      const char *name, u16 *value);
+	int acpi_dev_get_property_u8(struct acpi_device *adev,
+				     const char *name, u8 *value);
+
+Each function takes the ACPI device pointer and property name. If an
+integer property with given name is found, it is cast to the desired Linux
+integer type and returned in value parameter. Functions return 0 if the
+property is found and is of correct type. Otherwise return value is
+negative errno.
+
+2.2 Integer arrays
+------------------
+An integer array is a package holding only integers. Arrays can be used to
+represent different things like Linux input key codes to GPIO mappings, pin
+control settings, dma request lines etc.
+
+An integer array looks like this:
+
+	Package () { "data_width", Package () { 3, 3, 0, 0 } },
+	Package () {
+		"max8952,dvs-mode-microvolt",
+		Package () {
+			1250000,
+			1200000,
+			1050000,
+			950000,
+		}
+	}
+
+Note that an ACPI buffer is also u8 array and that is supported by
+acpi_dev_get_property_array_u8(). Buffer looks like this:
+
+	Package () { "init-seq", Buffer () { 0xff, 0xfe, 0xfd, 0xa } },
+
+Thee helper functions that can be used to extract integer array properties
+are listed below:
+
+	int acpi_dev_get_property_array_u64(struct acpi_device *adev,
+					    const char *name, u64 *values,
+					    size_t nvalues);
+	int acpi_dev_get_property_array_u32(struct acpi_device *adev,
+					    const char *name, u32 *values,
+					    size_t nvalues);
+	int acpi_dev_get_property_array_u16(struct acpi_device *adev,
+					    const char *name, u16 *values,
+					    size_t nvalues);
+	int acpi_dev_get_property_array_u8(struct acpi_device *adev,
+					   const char *name, u8 *values,
+					   size_t nvalues);
+
+All functions copy the resulting values cast to a requested type to the
+caller supplied array. Functions return size of the actual array. This can
+be useful if caller doesn't know size of the array beforehand.
+
+2.3 Strings
+-----------
+String properties can be used to describe many things like labels for GPIO
+buttons, compability ids etc.
+
+A string property looks like this:
+
+	Package () { "linux,default-trigger", "backlight" },
+	Package () { "label", "Status-LED" },
+
+One helper function is provided that can be used to extract strings:
+
+	int acpi_dev_get_property_string(struct acpi_device *adev,
+					 const char *name, const char **value);
+
+Note that the function doesn't copy the returned string but instead the
+value is modified to point to the string property itself. The memory is
+owned by the associated ACPI device object and released when it is removed.
+
+2.4 String arrays
+-----------------
+String arrays can be useful in describing list of labels, names for DMA
+channels etc.
+
+A string array property looks like this:
+
+	Package () { "dma-names", Package () { "tx", "rx", "rx-tx" } },
+	Package () { "clock-output-names", Package () { "pll", "pll-switched" } },
+
+The following function can be used to extract string arrays:
+
+	int acpi_dev_get_property_array_string(struct acpi_device *adev,
+					       const char *name,
+					       const char **values,
+					       size_t nvalues);
+
+Note that same memory management rules apply here than with
+acpi_dev_get_property_string().
+
+2.5 Object references
+---------------------
+An ACPI object reference is used to refer some object in the namespace. For
+example if this device has dependencies with some other object, an object
+reference can be used.
+
+An object reference looks like this:
+
+	Package () { "gpio-controller", \_SB.PCI0.GPI0 },
+
+Object references can be extracted with the following helper function:
+
+	int acpi_dev_get_property_reference(struct acpi_device *adev,
+					    const char *name,
+					    acpi_handle *obj_handle);
+
+The referenced ACPI object handle is passed in obj_handle parameter if the
+property is found.
+
+2.6 Raw properties
+------------------
+In some cases there is no helper function provided that could be used to
+translate the returned property value to a suitable Linux data type. Here
+using raw properties come handy.
+
+Let's take for example the following property:
+
+	Package () {
+		"linux,keys",
+		Package () {
+			{ 105, 1, "minnow_btn0" },
+			{ 108, 1, "minnow_btn1" },
+			{ 103, 1, "minnow_btn2" },
+			{ 106, 1, "minnow_btn3" },
+		}
+	},
+
+Since there is no helper funtion that could understand the above, we use
+acpi_dev_get_property() interface, which returns the raw ACPI object. We
+then process this returned object to extract our data:
+
+	const union acpi_object *obj;
+	int ret;
+
+	ret = acpi_dev_get_property(adev, "linux,keys", ACPI_TYPE_PACKAGE,
+				    &obj);
+	if (!ret) {
+		const union acpi_object *value;
+
+		/*
+		 * Now go through each entry in the package and extract the
+		 * three values in a tuple.
+		 */
+		for (i = 0; i < obj->package.count; i++) {
+			value = &obj->package.elements[i];
+
+			if (value->type != ACPI_TYPE_PACKAGE)
+				return -EINVAL;
+
+			...
+		}
+	}
