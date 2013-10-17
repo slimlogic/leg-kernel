@@ -479,6 +479,12 @@ acpi_buffer_to_resource(u8 *aml_buffer,
 			struct acpi_resource **resource_ptr);
 
 /*
+ * ACPI device properties
+ */
+acpi_status
+acpi_get_properties(acpi_handle device_handle, struct acpi_buffer *ret_buffer);
+
+/*
  * Hardware (ACPI device) interfaces
  */
 acpi_status acpi_reset(void);
