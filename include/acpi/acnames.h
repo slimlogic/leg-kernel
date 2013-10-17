@@ -65,6 +65,7 @@
 #define METHOD_NAME__STA        "_STA"
 #define METHOD_NAME__SUB        "_SUB"
 #define METHOD_NAME__UID        "_UID"
+#define METHOD_NAME__PRP        "_PRP"
 
 /* Method names - these methods must appear at the namespace root */
 
