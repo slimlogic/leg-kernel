@@ -176,3 +176,5 @@ acpi-y +=		\
 
 acpi-$(ACPI_FUTURE_USAGE) += uttrack.o utcache.o
 
+acpi-y +=		\
+	prxface.o

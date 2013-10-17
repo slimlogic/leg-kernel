@@ -65,6 +65,7 @@
 #define METHOD_NAME__SRS        "_SRS"
 #define METHOD_NAME__CBA        "_CBA"
 #define METHOD_NAME__PLD        "_PLD"
+#define METHOD_NAME__PRP        "_PRP"
 
 /* Method names - these methods must appear at the namespace root */
 
