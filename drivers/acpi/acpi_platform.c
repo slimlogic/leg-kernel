@@ -31,10 +31,10 @@ static const struct acpi_device_id acpi_platform_device_ids[] = {
 	{ "PNP0D40" },
 
 	/* arm64 platform devices */
-	{ "LINA0003" },
-	{ "LINA0005" },
-	{ "LINA0007" },
-	{ "LINA0009" },
+	{ "LINA0003" }, /* smc91x for ethernet */
+	{ "LINA0005" }, /* virtio mmio */
+	{ "LINA0007" }, /* armv8 pmu */
+	{ "LINA0009" }, /* vexpress-sysreg */
 
 	{ }
 };
