@@ -100,10 +100,7 @@
 #include <linux/virtio_config.h>
 #include <linux/virtio_mmio.h>
 #include <linux/virtio_ring.h>
-
-#ifdef CONFIG_ACPI
 #include <linux/acpi.h>
-#endif
 
 /* The alignment to use between consumer and producer parts of vring.
  * Currently hardcoded to the page size. */
