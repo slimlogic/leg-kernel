@@ -82,16 +82,13 @@ static const char version[] =
 #include <linux/mii.h>
 #include <linux/workqueue.h>
 #include <linux/of.h>
+#include <linux/acpi.h>
 
 #include <linux/netdevice.h>
 #include <linux/etherdevice.h>
 #include <linux/skbuff.h>
 
 #include <asm/io.h>
-
-#ifdef CONFIG_ACPI
-#include <linux/acpi.h>
-#endif
 
 #include "smc91x.h"
 
