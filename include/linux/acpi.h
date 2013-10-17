@@ -284,6 +284,35 @@ int acpi_check_region(resource_size_t start, resource_size_t n,
 
 int acpi_resources_are_enforced(void);
 
+int acpi_dev_get_properties(struct acpi_device *adev,
+			    int (*callback)(const union acpi_object *, void *),
+			    void *data);
+int acpi_dev_get_property(struct acpi_device *adev, const char *name,
+			  acpi_object_type type, const union acpi_object **obj);
+int acpi_dev_get_property_u64(struct acpi_device *adev, const char *name,
+			      u64 *value);
+int acpi_dev_get_property_u32(struct acpi_device *adev, const char *name,
+			      u32 *value);
+int acpi_dev_get_property_u16(struct acpi_device *adev, const char *name,
+			      u16 *value);
+int acpi_dev_get_property_u8(struct acpi_device *adev, const char *name,
+			     u8 *value);
+int acpi_dev_get_property_array_u64(struct acpi_device *adev, const char *name,
+				    u64 *values, size_t nvalues);
+int acpi_dev_get_property_array_u32(struct acpi_device *adev, const char *name,
+				    u32 *values, size_t nvalues);
+int acpi_dev_get_property_array_u16(struct acpi_device *adev, const char *name,
+				    u16 *values, size_t nvalues);
+int acpi_dev_get_property_array_u8(struct acpi_device *adev, const char *name,
+				   u8 *values, size_t nvalues);
+int acpi_dev_get_property_string(struct acpi_device *adev, const char *name,
+				 const char **value);
+int acpi_dev_get_property_array_string(struct acpi_device *adev,
+				       const char *name, const char **values,
+				       size_t nvalues);
+int acpi_dev_get_property_reference(struct acpi_device *adev, const char *name,
+				    acpi_handle *obj_handle);
+
 #ifdef CONFIG_HIBERNATION
 void __init acpi_no_s4_hw_signature(void);
 #endif

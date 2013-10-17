@@ -174,4 +174,10 @@ bool acpi_video_backlight_quirks(void);
 static inline bool acpi_video_backlight_quirks(void) { return false; }
 #endif
 
+/*--------------------------------------------------------------------------
+				Device properties
+  -------------------------------------------------------------------------- */
+void acpi_init_properties(struct acpi_device *adev);
+void acpi_free_properties(struct acpi_device *adev);
+
 #endif /* _ACPI_INTERNAL_H_ */

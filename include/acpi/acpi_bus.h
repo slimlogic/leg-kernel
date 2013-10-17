@@ -306,6 +306,7 @@ struct acpi_device {
 	struct acpi_device_dir dir;
 	struct acpi_scan_handler *handler;
 	struct acpi_driver *driver;
+	const union acpi_object *properties;
 	void *driver_data;
 	struct device dev;
 	unsigned int physical_node_count;
