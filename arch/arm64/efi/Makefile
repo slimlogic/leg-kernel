@@ -7,20 +7,26 @@
 # Author: Mark Salter <msalter@redhat.com>
 #
 
-libfdt		:= fdt_rw.c fdt_ro.c fdt_wip.c fdt.c
+ifeq ($(CONFIG_EFI),y)
+efi_objs += efi.o
+endif
+ifeq ($(CONFIG_EFI_STUB),y)
+efi_objs += efi-stub.o efi-entry.o
+endif
+
+libfdt_src	:= fdt_rw.c fdt_ro.c fdt_wip.c fdt.c
 libfdt_hdrs	:= fdt.h libfdt.h libfdt_internal.h
 
-libfdt_objs	:= $(addsuffix .o, $(basename $(libfdt)))
+libfdt_objs	:= $(addsuffix .o, $(basename $(libfdt_src)))
 
-$(addprefix $(obj)/,$(libfdt) $(libfdt_hdrs)): $(obj)/%: $(srctree)/scripts/dtc/libfdt/%
+$(addprefix $(obj)/,$(libfdt_src) $(libfdt_hdrs)): $(obj)/%: $(srctree)/scripts/dtc/libfdt/%
 	$(call cmd,shipped)
 
-$(addprefix $(obj)/,$(libfdt_objs) efi-stub.o efi-entry.o): \
-	$(addprefix $(obj)/,$(libfdt_hdrs))
+$(addprefix $(obj)/,$(libfdt_objs)): $(addprefix $(obj)/,$(libfdt_hdrs))
 
 CFLAGS_efi-stub.o += -DTEXT_OFFSET=$(TEXT_OFFSET)
 ccflags-y := -I$(obj) -I$(srctree)/$(obj)
 
-obj-y	+= $(libfdt_objs) efi-stub.o efi-entry.o
+obj-y	+= $(libfdt_objs) $(efi_objs)
 
-clean-files := $(libfdt) $(libfdt_hdrs)
+clean-files := $(libfdt_src) $(libfdt_hdrs)
