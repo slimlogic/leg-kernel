@@ -42,6 +42,9 @@
 #include <linux/of_fdt.h>
 #include <linux/of_platform.h>
 #include <linux/efi.h>
+#ifdef CONFIG_ACPI
+#include <linux/acpi.h>
+#endif
 
 #include <asm/fixmap.h>
 #include <asm/cputype.h>
@@ -56,6 +59,9 @@
 #include <asm/memblock.h>
 #include <asm/psci.h>
 #include <asm/efi.h>
+#ifdef CONFIG_ACPI
+#include <asm/acpi.h>
+#endif
 
 unsigned int processor_id;
 EXPORT_SYMBOL(processor_id);
@@ -260,7 +266,20 @@ void __init setup_arch(char **cmdline_p)
 
 	arm64_memblock_init();
 
+#ifdef CONFIG_ACPI
+	arm_acpi_reserve_memory();
+#endif
 	efi_init();
+#ifdef CONFIG_ACPI
+	/*
+	 * Parse the ACPI tables for possible boot-time configuration
+	 */
+	acpi_boot_table_init();
+	early_acpi_boot_init();
+	boot_cpu_apic_id = read_cpuid_mpidr() & MPIDR_HWID_BITMASK;
+	acpi_boot_init();
+	prefill_possible_map();
+#endif
 	paging_init();
 	request_standard_resources();
 

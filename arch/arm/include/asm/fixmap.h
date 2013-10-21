@@ -65,4 +65,4 @@ static inline unsigned int virt_to_fix(const unsigned long vaddr)
 	return __virt_to_fix(vaddr);
 }
 
-#endif
+#endif /* _ASM_FIXMAP_H */

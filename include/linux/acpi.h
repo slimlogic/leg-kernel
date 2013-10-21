@@ -49,6 +49,7 @@ enum acpi_irq_model_id {
 	ACPI_IRQ_MODEL_IOAPIC,
 	ACPI_IRQ_MODEL_IOSAPIC,
 	ACPI_IRQ_MODEL_PLATFORM,
+	ACPI_IRQ_MODEL_GIC,
 	ACPI_IRQ_MODEL_COUNT
 };
 
@@ -87,7 +88,7 @@ static inline void acpi_initrd_override(void *data, size_t size)
 }
 #endif
 
-char * __acpi_map_table (unsigned long phys_addr, unsigned long size);
+char *__acpi_map_table(phys_addr_t phys_addr, unsigned long size);
 void __acpi_unmap_table(char *map, unsigned long size);
 int early_acpi_boot_init(void);
 int acpi_boot_init (void);
