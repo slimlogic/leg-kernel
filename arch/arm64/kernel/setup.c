@@ -175,6 +175,10 @@ static void __init setup_machine_fdt(phys_addr_t dt_phys)
 
 	/* Retrieve various information from the /chosen node */
 	of_scan_flat_dt(early_init_dt_scan_chosen, boot_command_line);
+#ifdef CONFIG_ACPI
+	/* Retrieve ACPI pointers from /chosen node */
+	of_scan_flat_dt(early_init_dt_scan_acpi, &acpi_arm_rsdp_info);
+#endif
 	/* Initialize {size,address}-cells info */
 	of_scan_flat_dt(early_init_dt_scan_root, NULL);
 	/* Setup memory, calling early_init_dt_add_memory_arch */
