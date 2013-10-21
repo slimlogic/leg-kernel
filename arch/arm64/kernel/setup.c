@@ -41,7 +41,9 @@
 #include <linux/memblock.h>
 #include <linux/of_fdt.h>
 #include <linux/of_platform.h>
+#include <linux/efi.h>
 
+#include <asm/fixmap.h>
 #include <asm/cputype.h>
 #include <asm/elf.h>
 #include <asm/cputable.h>
@@ -53,6 +55,7 @@
 #include <asm/traps.h>
 #include <asm/memblock.h>
 #include <asm/psci.h>
+#include <asm/efi.h>
 
 unsigned int processor_id;
 EXPORT_SYMBOL(processor_id);
@@ -252,12 +255,17 @@ void __init setup_arch(char **cmdline_p)
 
 	*cmdline_p = boot_command_line;
 
+	early_ioremap_init();
 	parse_early_param();
 
 	arm64_memblock_init();
 
+	efi_init();
 	paging_init();
 	request_standard_resources();
+
+	if (efi_enabled(EFI_BOOT))
+		efi_enter_virtual_mode();
 
 	unflatten_device_tree();
 
