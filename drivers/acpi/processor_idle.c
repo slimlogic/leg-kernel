@@ -763,6 +763,7 @@ static int acpi_idle_enter_c1(struct cpuidle_device *dev,
  * @dev: the target CPU
  * @index: the index of suggested state
  */
+#ifdef CONFIG_X86
 static int acpi_idle_play_dead(struct cpuidle_device *dev, int index)
 {
 	struct acpi_processor_cx *cx = per_cpu(acpi_cstate[index], dev->cpu);
@@ -770,9 +771,6 @@ static int acpi_idle_play_dead(struct cpuidle_device *dev, int index)
 	ACPI_FLUSH_CPU_CACHE();
 
 	while (1) {
-
-#ifdef CONFIG_X86
-		/* BOZO: abstract out? */
 		if (cx->entry_method == ACPI_CSTATE_HALT)
 			safe_halt();
 		else if (cx->entry_method == ACPI_CSTATE_SYSTEMIO) {
@@ -780,13 +778,18 @@ static int acpi_idle_play_dead(struct cpuidle_device *dev, int index)
 			/* See comment in acpi_idle_do_entry() */
 			inl(acpi_gbl_FADT.xpm_timer_block.address);
 		} else
-#endif
 			return -ENODEV;
 	}
 
 	/* Never reached */
 	return 0;
 }
+#else
+static int acpi_idle_play_dead(struct cpuidle_device *dev, int index)
+{
+	return 0;
+}
+#endif
 
 /**
  * acpi_idle_enter_simple - enters an ACPI state without BM handling
