@@ -796,7 +796,6 @@ int __init early_init_dt_scan_acpi(unsigned long node, const char *uname,
 	unsigned long l;
 	unsigned int *p;
 	struct acpi_arm_root *pinfo;
-	unsigned char *sig;
 
 	pr_debug("search \"chosen\" for acpi info, depth: %d, uname: %s\n",
 			depth, uname);
