@@ -21,6 +21,8 @@
 #include <linux/workqueue.h>
 #include <linux/module.h>
 #include <linux/err.h>
+#include <linux/acpi.h>
+#include <linux/acpi_gpio.h>
 
 struct gpio_led_data {
 	struct led_classdev cdev;
@@ -231,6 +233,127 @@ static struct gpio_leds_priv *gpio_leds_create_of(struct platform_device *pdev)
 #endif /* CONFIG_OF_GPIO */
 
 
+/* Code to create from ACPI platform devices */
+#ifdef CONFIG_ACPI
+static inline struct gpio_leds_priv *
+gpio_leds_create_acpi(struct platform_device *pdev)
+{
+	struct device *dev = &pdev->dev;
+	struct acpi_device *adev;
+	struct gpio_leds_priv *priv;
+	int ret;
+
+	int nleds, i, error;
+	acpi_handle handle;
+	const char **trigger;
+	const char **state;
+	u32 *retain_state_suspended;
+	const char **label;
+
+	handle = ACPI_HANDLE(dev);
+	if (!handle || acpi_bus_get_device(handle, &adev))
+		return ERR_PTR(-ENODEV);
+
+	nleds = 0;
+	while (acpi_get_gpio_by_index(dev, nleds, NULL) >= 0)
+		nleds++;
+	if (!nleds)
+		return ERR_PTR(-ENODEV);
+
+	priv = devm_kzalloc(dev, sizeof_gpio_leds_priv(nleds), GFP_KERNEL);
+	if (!priv)
+		return ERR_PTR(-ENOMEM);
+
+	/* Array size is returned on successful array property lookup */
+	trigger = kcalloc(nleds, sizeof(char *), GFP_KERNEL);
+	error = acpi_dev_get_property_array_string(adev, "linux,default-trigger",
+						   trigger, nleds);
+	if (error < 0)
+		goto err_free_trigger;
+
+	state = kcalloc(nleds, sizeof(char *), GFP_KERNEL);
+	error = acpi_dev_get_property_array_string(adev, "linux,default-state",
+						   state, nleds);
+	if (error < 0)
+		goto err_free_state;
+
+	retain_state_suspended = kcalloc(nleds, sizeof(u32), GFP_KERNEL);
+	error = acpi_dev_get_property_array_u32(adev, "linux,retain-state-suspended",
+						retain_state_suspended, nleds);
+	if (error < 0)
+		goto err_free_retain_state_suspended;
+
+	label = kcalloc(nleds, sizeof(char *), GFP_KERNEL);
+	error = acpi_dev_get_property_array_string(adev, "label",
+						   label, nleds);
+	if (error < 0)
+		goto err_free_label;
+
+
+	for (i = 0; i < nleds; i++)
+	{
+		struct gpio_led led = {};
+
+		led.gpio = acpi_get_gpio_by_index(dev, i, NULL);
+
+		/* gpiod_is_active_low() once merged */
+		led.active_low = false;
+		led.name = label[i];
+		led.default_trigger = trigger[i];
+		if (state[i]) {
+			if (!strcmp(state[i], "keep"))
+				led.default_state = LEDS_GPIO_DEFSTATE_KEEP;
+			else if (!strcmp(state[i], "on"))
+				led.default_state = LEDS_GPIO_DEFSTATE_ON;
+			else
+				led.default_state = LEDS_GPIO_DEFSTATE_OFF;
+		}
+		led.retain_state_suspended = retain_state_suspended[i];
+
+		ret = create_gpio_led(&led, &priv->leds[priv->num_leds++],
+				      &pdev->dev, NULL);
+		if (ret < 0)
+			goto err;
+	}
+
+	kfree(state);
+	kfree(trigger);
+	kfree(retain_state_suspended);
+	kfree(label);
+
+	return priv;
+
+err:
+	error = -ENODEV;
+	for (i = priv->num_leds - 2; i >= 0; i--)
+		delete_gpio_led(&priv->leds[i]);
+err_free_label:
+	kfree(label);
+err_free_retain_state_suspended:
+	kfree(retain_state_suspended);
+err_free_state:
+	kfree(state);
+err_free_trigger:
+	kfree(trigger);
+
+	return ERR_PTR(error);
+}
+
+
+static const struct acpi_device_id acpi_gpio_leds_match[] = {
+	{ "MNW0003" },
+	{},
+};
+MODULE_DEVICE_TABLE(acpi, acpi_gpio_leds_match);
+#else
+static inline struct gpio_keys_platform_data *
+gpio_leds_create_acpi(struct platform_device *pdev)
+{
+	return ERR_PTR(-ENODEV);
+}
+#endif
+
+
 static int gpio_led_probe(struct platform_device *pdev)
 {
 	struct gpio_led_platform_data *pdata = dev_get_platdata(&pdev->dev);
@@ -259,6 +382,9 @@ static int gpio_led_probe(struct platform_device *pdev)
 		}
 	} else {
 		priv = gpio_leds_create_of(pdev);
+		if (PTR_ERR(priv) == -ENODEV)
+			priv = gpio_leds_create_acpi(pdev);
+
 		if (IS_ERR(priv))
 			return PTR_ERR(priv);
 	}
@@ -286,6 +412,7 @@ static struct platform_driver gpio_led_driver = {
 		.name	= "leds-gpio",
 		.owner	= THIS_MODULE,
 		.of_match_table = of_match_ptr(of_gpio_leds_match),
+		.acpi_match_table = ACPI_PTR(acpi_gpio_leds_match),
 	},
 };
 
