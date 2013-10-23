@@ -35,6 +35,7 @@ static const struct acpi_device_id acpi_platform_device_ids[] = {
 	{ "LINA0005" }, /* virtio mmio */
 	{ "LINA0007" }, /* armv8 pmu */
 	{ "LINA0009" }, /* vexpress-sysreg */
+	{ "LINA000A" }, /* uart-pl011 */
 
 	{ }
 };
