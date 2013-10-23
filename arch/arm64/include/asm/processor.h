@@ -155,6 +155,19 @@ static inline void spin_lock_prefetch(const void *x)
 	prefetchw(x);
 }
 
+/*
+ * Not all ARM devices have ACPI, but some do
+ * BOZO: is this correct?
+ */
+#ifdef CONFIG_ACPI
+enum idle_boot_override { IDLE_NO_OVERRIDE = 0, IDLE_HALT, IDLE_NOMWAIT,
+			  IDLE_POLL, IDLE_FORCE_MWAIT };
+
+extern unsigned long	boot_option_idle_override;
+#endif
+
+/* end BOZO */
+
 #define HAVE_ARCH_PICK_MMAP_LAYOUT
 
 #endif
