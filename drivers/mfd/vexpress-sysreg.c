@@ -22,6 +22,7 @@
 #include <linux/stat.h>
 #include <linux/timer.h>
 #include <linux/vexpress.h>
+#include <linux/acpi.h>
 
 #define SYS_ID			0x000
 #define SYS_SW			0x004
@@ -512,10 +513,18 @@ static const struct of_device_id vexpress_sysreg_match[] = {
 	{},
 };
 
+#ifdef CONFIG_ACPI
+static const struct acpi_device_id vexpress_sysreg_acpi_match[] = {
+	{ "LNRO0009", },
+	{ }
+};
+#endif
+
 static struct platform_driver vexpress_sysreg_driver = {
 	.driver = {
 		.name = "vexpress-sysreg",
 		.of_match_table = vexpress_sysreg_match,
+		.acpi_match_table = ACPI_PTR(vexpress_sysreg_acpi_match),
 	},
 	.probe = vexpress_sysreg_probe,
 };
