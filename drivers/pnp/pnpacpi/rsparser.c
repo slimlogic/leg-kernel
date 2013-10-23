@@ -113,8 +113,10 @@ static int dma_flags(struct pnp_dev *dev, int type, int bus_master,
 
 static void pnpacpi_add_irqresource(struct pnp_dev *dev, struct resource *r)
 {
+#ifdef CONFIG_PCI
 	if (!(r->flags & IORESOURCE_DISABLED))
 		pcibios_penalize_isa_irq(r->start, 1);
+#endif
 
 	pnp_add_resource(dev, r);
 }
