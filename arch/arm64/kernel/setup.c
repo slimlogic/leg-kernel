@@ -46,6 +46,7 @@
 #include <linux/acpi.h>
 #endif
 
+#include <asm/fixmap.h>
 #include <asm/cputype.h>
 #include <asm/elf.h>
 #include <asm/cputable.h>
