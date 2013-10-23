@@ -27,6 +27,8 @@
 #include <linux/gpio_keys.h>
 #include <linux/of_platform.h>
 #include <linux/of_gpio.h>
+#include <linux/acpi.h>
+#include <linux/acpi_gpio.h>
 
 #define DRV_NAME	"gpio-keys-polled"
 
@@ -206,6 +208,108 @@ gpio_keys_polled_get_devtree_pdata(struct device *dev)
 }
 #endif
 
+#ifdef CONFIG_ACPI
+static inline struct gpio_keys_platform_data *
+gpio_keys_polled_get_acpi_pdata(struct device *dev)
+{
+	struct gpio_keys_platform_data *pdata;
+	struct gpio_keys_button *button;
+	struct acpi_device *adev;
+	int nbuttons, i, error;
+	acpi_handle handle;
+	u32 *code, *type;
+	const char **label;
+	u32 tmp;
+
+	handle = ACPI_HANDLE(dev);
+	if (!handle || acpi_bus_get_device(handle, &adev))
+		return ERR_PTR(-ENODEV);
+
+	nbuttons = 0;
+	while (acpi_get_gpio_by_index(dev, nbuttons, NULL) >= 0)
+		nbuttons++;
+	if (!nbuttons)
+		return ERR_PTR(-ENODEV);
+
+	pdata = kzalloc(sizeof(*pdata) + nbuttons * sizeof(*button),
+			GFP_KERNEL);
+	if (!pdata)
+		return ERR_PTR(-ENOMEM);
+
+	pdata->buttons = (struct gpio_keys_button *)(pdata + 1);
+	pdata->nbuttons = nbuttons;
+
+	error = acpi_dev_get_property_u32(adev, "poll-interval",
+					  &pdata->poll_interval);
+	if (error)
+		goto err_free_pdata;
+
+	error = acpi_dev_get_property_u32(adev, "autorepeat", &tmp);
+	if (error)
+		goto err_free_pdata;
+
+	pdata->rep = !!tmp;
+
+	/* Array size is returned on successful array property lookup */
+	code = kcalloc(nbuttons, sizeof(u32), GFP_KERNEL);
+	error = acpi_dev_get_property_array_u32(adev, "linux,code", code,
+						nbuttons);
+	if (error < 0)
+		goto err_free_code;
+
+	type = kcalloc(nbuttons, sizeof(u32), GFP_KERNEL);
+	error = acpi_dev_get_property_array_u32(adev, "linux,input-type",
+						type, nbuttons);
+	if (error < 0)
+		goto err_free_type;
+
+	label = kcalloc(nbuttons, sizeof(char *), GFP_KERNEL);
+	error = acpi_dev_get_property_array_string(adev, "label", label,
+						   nbuttons);
+	if (error < 0)
+		goto err_free_label;
+
+	for (i = 0; i < nbuttons; i++) {
+		struct gpio_keys_button *button = &pdata->buttons[i];
+
+		button->gpio = acpi_get_gpio_by_index(dev, i, NULL);
+		/* gpiod_is_active_low() once merged */
+		button->active_low = true;
+		button->desc = label[i];
+		button->code = code[i];
+		button->type = type[i];
+	}
+
+	kfree(label);
+	kfree(type);
+	kfree(code);
+	return pdata;
+
+err_free_label:
+	kfree(label);
+err_free_type:
+	kfree(type);
+err_free_code:
+	kfree(code);
+err_free_pdata:
+	kfree(pdata);
+
+	return ERR_PTR(error);
+}
+
+static struct acpi_device_id gpio_keys_polled_acpi_match[] = {
+	{ "MNW0002" },
+	{ },
+};
+MODULE_DEVICE_TABLE(acpi, gpio_keys_polled_acpi_match);
+#else
+static inline struct gpio_keys_platform_data *
+gpio_keys_polled_get_acpi_pdata(struct device *dev)
+{
+	return NULL;
+}
+#endif
+
 static int gpio_keys_polled_probe(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
@@ -218,8 +322,12 @@ static int gpio_keys_polled_probe(struct platform_device *pdev)
 
 	if (!pdata) {
 		pdata = gpio_keys_polled_get_devtree_pdata(dev);
+		if (!pdata)
+			pdata = gpio_keys_polled_get_acpi_pdata(dev);
+
 		if (IS_ERR(pdata))
 			return PTR_ERR(pdata);
+
 		if (!pdata) {
 			dev_err(dev, "missing platform data\n");
 			return -EINVAL;
@@ -365,6 +473,7 @@ static struct platform_driver gpio_keys_polled_driver = {
 		.name	= DRV_NAME,
 		.owner	= THIS_MODULE,
 		.of_match_table = of_match_ptr(gpio_keys_polled_of_match),
+		.acpi_match_table = ACPI_PTR(gpio_keys_polled_acpi_match),
 	},
 };
 module_platform_driver(gpio_keys_polled_driver);
