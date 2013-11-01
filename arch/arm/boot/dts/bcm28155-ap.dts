@@ -62,4 +62,12 @@
 		max-frequency = <48000000>;
 		status = "okay";
 	};
+
+	usbotg@3f120000 {
+		status = "okay";
+	};
+
+	usbphy@3f130000 {
+		status = "okay";
+	};
 };
