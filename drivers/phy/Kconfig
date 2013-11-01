@@ -15,4 +15,10 @@ config GENERIC_PHY
 	  phy users can obtain reference to the PHY. All the users of this
 	  framework should select this config.
 
+config BCM_KONA_USB2_PHY
+	tristate "Broadcom Kona USB2 PHY Driver"
+	depends on GENERIC_PHY
+	help
+	  Enable this to support the Broadcom Kona USB 2.0 PHY.
+
 endmenu
