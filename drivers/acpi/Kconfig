@@ -389,6 +389,14 @@ config ACPI_BGRT
 	  data from the firmware boot splash. It will appear under
 	  /sys/firmware/acpi/bgrt/ .
 
+config ACPI_REDUCED_HARDWARE
+	bool "Hardware-reduced ACPI support"
+	depends on !(IA64 || X86)
+	help
+	This config adds support for Hardware-reduced ACPI. When this option
+	is selected, will generate a specialized version of ACPICA that ONLY
+	supports the ACPI "reduced hardware".
+
 source "drivers/acpi/apei/Kconfig"
 
 endif	# ACPI
