@@ -82,6 +82,7 @@
 /* Blob handling macros */
 #define	ACPI_BLOB_HEADER_SIZE	8
 
+#ifndef CONFIG_ACPI_REDUCED_HARDWARE
 int __acpi_acquire_global_lock(unsigned int *lock);
 int __acpi_release_global_lock(unsigned int *lock);
 
@@ -90,9 +91,9 @@ int __acpi_release_global_lock(unsigned int *lock);
 
 #define ACPI_RELEASE_GLOBAL_LOCK(facs, Acq) \
 	((Acq) = __acpi_release_global_lock(&facs->global_lock))
+#endif
 
 /* Basic configuration for ACPI */
-/* BOZO: hardware reduced acpi only? */
 #ifdef	CONFIG_ACPI
 extern int acpi_disabled;
 extern int acpi_noirq;

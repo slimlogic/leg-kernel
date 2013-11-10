@@ -786,6 +786,7 @@ static int __init parse_acpi(char *arg)
 }
 early_param("acpi", parse_acpi);
 
+#if (!ACPI_REDUCED_HARDWARE)
 int __acpi_acquire_global_lock(unsigned int *lock)
 {
 	unsigned int old, new, val;
@@ -807,3 +808,4 @@ int __acpi_release_global_lock(unsigned int *lock)
 	} while (unlikely (val != old));
 	return old & 0x1;
 }
+#endif
