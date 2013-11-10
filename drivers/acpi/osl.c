@@ -161,6 +161,9 @@ static u32 acpi_osi_handler(acpi_string interface, u32 supported)
 	return supported;
 }
 
+#ifdef CONFIG_ACPI_REDUCED_HARDWARE
+static int __init acpi_reserve_resources(void) { return 0; }
+#else
 static void __init acpi_request_region (struct acpi_generic_address *gas,
 	unsigned int length, char *desc)
 {
@@ -210,6 +213,7 @@ static int __init acpi_reserve_resources(void)
 
 	return 0;
 }
+#endif
 device_initcall(acpi_reserve_resources);
 
 void acpi_os_printf(const char *fmt, ...)
@@ -1821,6 +1825,9 @@ static int __init acpi_no_auto_ssdt_setup(char *s)
 
 __setup("acpi_no_auto_ssdt", acpi_no_auto_ssdt_setup);
 
+#ifdef CONFIG_ACPI_REDUCED_HARDWARE
+acpi_status __init acpi_os_initialize(void) { return AE_OK; }
+#else
 acpi_status __init acpi_os_initialize(void)
 {
 	acpi_os_map_generic_address(&acpi_gbl_FADT.xpm1a_event_block);
@@ -1830,6 +1837,7 @@ acpi_status __init acpi_os_initialize(void)
 
 	return AE_OK;
 }
+#endif
 
 acpi_status __init acpi_os_initialize1(void)
 {
