@@ -298,7 +298,8 @@ static int acpi_processor_get_power_info_fadt(struct acpi_processor *pr)
 	 * Check for P_LVL2_UP flag before entering C2 and above on
 	 * an SMP system.
 	 */
-	if ((num_online_cpus() > 1) &&
+	if (!acpi_gbl_reduced_hardware &&
+	    (num_online_cpus() > 1) &&
 	    !(acpi_gbl_FADT.flags & ACPI_FADT_C2_MP_SUPPORTED))
 		return -ENODEV;
 #endif
@@ -997,7 +998,8 @@ static int acpi_processor_setup_cpuidle_cx(struct acpi_processor *pr,
 			continue;
 
 #ifdef CONFIG_HOTPLUG_CPU
-		if ((cx->type != ACPI_STATE_C1) && (num_online_cpus() > 1) &&
+		if (!acpi_gbl_reduced_hardware &&
+		    (cx->type != ACPI_STATE_C1) && (num_online_cpus() > 1) &&
 		    !pr->flags.has_cst &&
 		    !(acpi_gbl_FADT.flags & ACPI_FADT_C2_MP_SUPPORTED))
 			continue;
@@ -1052,7 +1054,8 @@ static int acpi_processor_setup_cpuidle_states(struct acpi_processor *pr)
 			continue;
 
 #ifdef CONFIG_HOTPLUG_CPU
-		if ((cx->type != ACPI_STATE_C1) && (num_online_cpus() > 1) &&
+		if (!acpi_gbl_reduced_hardware &&
+		    (cx->type != ACPI_STATE_C1) && (num_online_cpus() > 1) &&
 		    !pr->flags.has_cst &&
 		    !(acpi_gbl_FADT.flags & ACPI_FADT_C2_MP_SUPPORTED))
 			continue;
