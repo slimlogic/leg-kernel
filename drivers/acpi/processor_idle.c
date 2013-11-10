@@ -219,15 +219,17 @@ static void lapic_timer_state_broadcast(struct acpi_processor *pr,
 #endif
 
 #ifdef CONFIG_PM_SLEEP
+#if (!ACPI_REDUCED_HARDWARE)
 static u32 saved_bm_rld;
+#endif
 
-static int acpi_processor_suspend(void)
+ACPI_HW_DEPENDENT_RETURN_INT(int acpi_processor_suspend(void))
 {
 	acpi_read_bit_register(ACPI_BITREG_BUS_MASTER_RLD, &saved_bm_rld);
 	return 0;
 }
 
-static void acpi_processor_resume(void)
+ACPI_HW_DEPENDENT_RETURN_VOID(void acpi_processor_resume(void))
 {
 	u32 resumed_bm_rld;
 
@@ -617,7 +619,7 @@ static int acpi_processor_power_verify(struct acpi_processor *pr)
 		case ACPI_STATE_C2:
 			if (!cx->address)
 				break;
-			cx->valid = 1; 
+			cx->valid = 1;
 			break;
 
 		case ACPI_STATE_C3:
