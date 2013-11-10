@@ -85,6 +85,7 @@ static int (*__acpi_os_prepare_extended_sleep)(u8 sleep_state, u32 val_a,
 
 static acpi_osd_handler acpi_irq_handler;
 static void *acpi_irq_context;
+static u32 acpi_irq_number;
 static struct workqueue_struct *kacpid_wq;
 static struct workqueue_struct *kacpi_notify_wq;
 static struct workqueue_struct *kacpi_hotplug_wq;
@@ -841,9 +842,9 @@ acpi_os_install_interrupt_handler(u32 gsi, acpi_osd_handler handler,
 
 	/*
 	 * ACPI interrupts different from the SCI in our copy of the FADT are
-	 * not supported.
+	 * not supported, except in HW reduced mode.
 	 */
-	if (gsi != acpi_gbl_FADT.sci_interrupt)
+	if (!acpi_gbl_reduced_hardware && (gsi != acpi_gbl_FADT.sci_interrupt))
 		return AE_BAD_PARAMETER;
 
 	if (acpi_irq_handler)
@@ -862,13 +863,14 @@ acpi_os_install_interrupt_handler(u32 gsi, acpi_osd_handler handler,
 		acpi_irq_handler = NULL;
 		return AE_NOT_ACQUIRED;
 	}
+	acpi_irq_number = irq;
 
 	return AE_OK;
 }
 
 acpi_status acpi_os_remove_interrupt_handler(u32 irq, acpi_osd_handler handler)
 {
-	if (irq != acpi_gbl_FADT.sci_interrupt)
+	if (!acpi_gbl_reduced_hardware && (irq != acpi_gbl_FADT.sci_interrupt))
 		return AE_BAD_PARAMETER;
 
 	free_irq(irq, acpi_irq);
@@ -1845,7 +1847,7 @@ acpi_status __init acpi_os_initialize1(void)
 acpi_status acpi_os_terminate(void)
 {
 	if (acpi_irq_handler) {
-		acpi_os_remove_interrupt_handler(acpi_gbl_FADT.sci_interrupt,
+		acpi_os_remove_interrupt_handler(acpi_irq_number,
 						 acpi_irq_handler);
 	}
 

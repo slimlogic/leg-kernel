@@ -543,7 +543,8 @@ void __init acpi_early_init(void)
 		goto error0;
 	}
 
-#ifdef CONFIG_X86
+#if (!CONFIG_ACPI_REDUCED_HARDWARE)
+	/* NB: in HW reduced mode, FADT sci_interrupt has no meaning */
 	if (!acpi_ioapic) {
 		/* compatible (0) means level (3) */
 		if (!(acpi_sci_flags & ACPI_MADT_TRIGGER_MASK)) {
