@@ -512,7 +512,7 @@ void __init acpi_early_init(void)
 
 	acpi_gbl_permanent_mmap = 1;
 
-#if (CONFIG_ARM || CONFIG_ARM64)
+#if !(defined(CONFIG_ARM) || defined(CONFIG_ARM64))
 	/*
 	 * NB: ARM does not use DMI at present.
 	 *
@@ -543,7 +543,7 @@ void __init acpi_early_init(void)
 		goto error0;
 	}
 
-#if (!CONFIG_ACPI_REDUCED_HARDWARE)
+#if !(defined(CONFIG_ARM) || defined(CONFIG_ARM64)) && (!ACPI_REDUCED_HARDWARE)
 	/* NB: in HW reduced mode, FADT sci_interrupt has no meaning */
 	if (!acpi_ioapic) {
 		/* compatible (0) means level (3) */
