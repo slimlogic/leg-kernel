@@ -652,7 +652,7 @@ static int acpi_processor_get_power_info(struct acpi_processor *pr)
 	memset(pr->power.states, 0, sizeof(pr->power.states));
 
 	result = acpi_processor_get_power_info_cst(pr);
-	if (result == -ENODEV)
+	if (!acpi_gbl_reduced_hardware && (result == -ENODEV))
 		result = acpi_processor_get_power_info_fadt(pr);
 
 	if (result)
