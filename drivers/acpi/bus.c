@@ -512,9 +512,9 @@ void __init acpi_early_init(void)
 
 	acpi_gbl_permanent_mmap = 1;
 
-#ifdef CONFIG_X86
+#if (CONFIG_ARM || CONFIG_ARM64)
 	/*
-	 * NB: ARM does not use DMI; only older Intel products do.
+	 * NB: ARM does not use DMI at present.
 	 *
 	 * If the machine falls into the DMI check table,
 	 * DSDT will be copied to memory
