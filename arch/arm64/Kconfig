@@ -239,6 +239,27 @@ config CMDLINE_FORCE
 	  This is useful if you cannot or don't want to change the
 	  command-line options your boot loader passes to the kernel.
 
+config EFI
+        bool "UEFI runtime service support"
+	depends on !CPU_BIG_ENDIAN && !ARM64_64K_PAGES && OF
+	select UCS2_STRING
+	---help---
+	  This enables the kernel to use UEFI runtime services that are
+	  available (such as the UEFI variable services).
+
+	  This option is only useful on systems that have UEFI firmware.
+	  However, even with this option, the resultant kernel should
+	  continue to boot on existing non-UEFI platforms.
+
+config EFI_STUB
+	bool "EFI stub support"
+	depends on !CPU_BIG_ENDIAN && !ARM64_64K_PAGES && OF
+	default y
+	help
+	  This kernel feature allows an Image to be loaded directly
+	  by EFI firmware without the use of a bootloader.
+	  See Documentation/efi-stub.txt for more information.
+
 endmenu
 
 menu "Userspace binary formats"
@@ -269,6 +290,8 @@ endmenu
 source "net/Kconfig"
 
 source "drivers/Kconfig"
+
+source "drivers/firmware/Kconfig"
 
 source "fs/Kconfig"
 
