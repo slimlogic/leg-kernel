@@ -453,19 +453,6 @@ int acpi_unmap_lsapic(int cpu)
 EXPORT_SYMBOL(acpi_unmap_lsapic);
 #endif				/* CONFIG_ACPI_HOTPLUG_CPU */
 
-static int __init acpi_parse_sbf(struct acpi_table_header *table)
-{
-	struct acpi_table_boot *sb;
-
-	sb = (struct acpi_table_boot *)table;
-	if (!sb) {
-		printk(KERN_WARNING PREFIX "Unable to map SBF\n");
-		return -ENODEV;
-	}
-
-	return 0;
-}
-
 /* Local APIC = GIC cpu interface on ARM */
 static int __init acpi_parse_madt_lapic_entries(void)
 {
@@ -628,8 +615,6 @@ void __init acpi_boot_table_init(void)
 		disable_acpi();
 		return;
 	}
-
-	acpi_table_parse(ACPI_SIG_BOOT, acpi_parse_sbf);
 }
 
 int __init early_acpi_boot_init(void)
@@ -655,8 +640,6 @@ int __init acpi_boot_init(void)
 	 */
 	if (acpi_disabled)
 		return 1;
-
-	acpi_table_parse(ACPI_SIG_BOOT, acpi_parse_sbf);
 
 	/*
 	 * set sci_int and PM timer address
