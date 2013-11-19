@@ -119,17 +119,26 @@ static struct dmi_system_id processor_power_dmi_table[] = {
  */
 static void acpi_safe_halt(void)
 {
+#ifdef CONFIG_X86
+	/* BOZO: abstract out? */
 	current_thread_info()->status &= ~TS_POLLING;
+#endif
 	/*
 	 * TS_POLLING-cleared state must be visible before we
 	 * test NEED_RESCHED:
 	 */
 	smp_mb();
 	if (!need_resched()) {
+#ifdef CONFIG_X86
+		/* BOZO: abstract out? */
 		safe_halt();
+#endif
 		local_irq_disable();
 	}
+#ifdef CONFIG_X86
+	/* BOZO: abstract out? */
 	current_thread_info()->status |= TS_POLLING;
+#endif
 }
 
 #ifdef ARCH_APICTIMER_STOPS_ON_C3
@@ -210,15 +219,17 @@ static void lapic_timer_state_broadcast(struct acpi_processor *pr,
 #endif
 
 #ifdef CONFIG_PM_SLEEP
+#if (!ACPI_REDUCED_HARDWARE)
 static u32 saved_bm_rld;
+#endif
 
-static int acpi_processor_suspend(void)
+ACPI_HW_DEPENDENT_RETURN_INT(int acpi_processor_suspend(void))
 {
 	acpi_read_bit_register(ACPI_BITREG_BUS_MASTER_RLD, &saved_bm_rld);
 	return 0;
 }
 
-static void acpi_processor_resume(void)
+ACPI_HW_DEPENDENT_RETURN_VOID(void acpi_processor_resume(void))
 {
 	u32 resumed_bm_rld;
 
@@ -287,7 +298,8 @@ static int acpi_processor_get_power_info_fadt(struct acpi_processor *pr)
 	 * Check for P_LVL2_UP flag before entering C2 and above on
 	 * an SMP system.
 	 */
-	if ((num_online_cpus() > 1) &&
+	if (!acpi_gbl_reduced_hardware &&
+	    (num_online_cpus() > 1) &&
 	    !(acpi_gbl_FADT.flags & ACPI_FADT_C2_MP_SUPPORTED))
 		return -ENODEV;
 #endif
@@ -608,7 +620,7 @@ static int acpi_processor_power_verify(struct acpi_processor *pr)
 		case ACPI_STATE_C2:
 			if (!cx->address)
 				break;
-			cx->valid = 1; 
+			cx->valid = 1;
 			break;
 
 		case ACPI_STATE_C3:
@@ -641,7 +653,7 @@ static int acpi_processor_get_power_info(struct acpi_processor *pr)
 	memset(pr->power.states, 0, sizeof(pr->power.states));
 
 	result = acpi_processor_get_power_info_cst(pr);
-	if (result == -ENODEV)
+	if (!acpi_gbl_reduced_hardware && (result == -ENODEV))
 		result = acpi_processor_get_power_info_fadt(pr);
 
 	if (result)
@@ -751,6 +763,7 @@ static int acpi_idle_enter_c1(struct cpuidle_device *dev,
  * @dev: the target CPU
  * @index: the index of suggested state
  */
+#ifdef CONFIG_X86
 static int acpi_idle_play_dead(struct cpuidle_device *dev, int index)
 {
 	struct acpi_processor_cx *cx = per_cpu(acpi_cstate[index], dev->cpu);
@@ -758,7 +771,6 @@ static int acpi_idle_play_dead(struct cpuidle_device *dev, int index)
 	ACPI_FLUSH_CPU_CACHE();
 
 	while (1) {
-
 		if (cx->entry_method == ACPI_CSTATE_HALT)
 			safe_halt();
 		else if (cx->entry_method == ACPI_CSTATE_SYSTEMIO) {
@@ -772,6 +784,12 @@ static int acpi_idle_play_dead(struct cpuidle_device *dev, int index)
 	/* Never reached */
 	return 0;
 }
+#else
+static int acpi_idle_play_dead(struct cpuidle_device *dev, int index)
+{
+	return 0;
+}
+#endif
 
 /**
  * acpi_idle_enter_simple - enters an ACPI state without BM handling
@@ -791,7 +809,10 @@ static int acpi_idle_enter_simple(struct cpuidle_device *dev,
 		return -EINVAL;
 
 	if (cx->entry_method != ACPI_CSTATE_FFH) {
+#ifdef CONFIG_X86
+		/* BOZO: abstract out? */
 		current_thread_info()->status &= ~TS_POLLING;
+#endif
 		/*
 		 * TS_POLLING-cleared state must be visible before we test
 		 * NEED_RESCHED:
@@ -799,7 +820,10 @@ static int acpi_idle_enter_simple(struct cpuidle_device *dev,
 		smp_mb();
 
 		if (unlikely(need_resched())) {
+#ifdef CONFIG_X86
+			/* BOZO: abstract out? */
 			current_thread_info()->status |= TS_POLLING;
+#endif
 			return -EINVAL;
 		}
 	}
@@ -819,8 +843,11 @@ static int acpi_idle_enter_simple(struct cpuidle_device *dev,
 
 	sched_clock_idle_wakeup_event(0);
 
+#ifdef CONFIG_X86
+	/* BOZO: abstract out? */
 	if (cx->entry_method != ACPI_CSTATE_FFH)
 		current_thread_info()->status |= TS_POLLING;
+#endif
 
 	lapic_timer_state_broadcast(pr, cx, 0);
 	return index;
@@ -859,7 +886,10 @@ static int acpi_idle_enter_bm(struct cpuidle_device *dev,
 	}
 
 	if (cx->entry_method != ACPI_CSTATE_FFH) {
+#ifdef CONFIG_X86
+		/* BOZO: abstract out? */
 		current_thread_info()->status &= ~TS_POLLING;
+#endif
 		/*
 		 * TS_POLLING-cleared state must be visible before we test
 		 * NEED_RESCHED:
@@ -867,12 +897,18 @@ static int acpi_idle_enter_bm(struct cpuidle_device *dev,
 		smp_mb();
 
 		if (unlikely(need_resched())) {
+#ifdef CONFIG_X86
+			/* BOZO: abstract out? */
 			current_thread_info()->status |= TS_POLLING;
+#endif
 			return -EINVAL;
 		}
 	}
 
+#ifdef CONFIG_X86
+	/* BOZO: abstract out? */
 	acpi_unlazy_tlb(smp_processor_id());
+#endif
 
 	/* Tell the scheduler that we are going deep-idle: */
 	sched_clock_idle_sleep_event();
@@ -915,8 +951,11 @@ static int acpi_idle_enter_bm(struct cpuidle_device *dev,
 
 	sched_clock_idle_wakeup_event(0);
 
+#ifdef CONFIG_X86
+	/* BOZO: abstract out? */
 	if (cx->entry_method != ACPI_CSTATE_FFH)
 		current_thread_info()->status |= TS_POLLING;
+#endif
 
 	lapic_timer_state_broadcast(pr, cx, 0);
 	return index;
@@ -962,7 +1001,8 @@ static int acpi_processor_setup_cpuidle_cx(struct acpi_processor *pr,
 			continue;
 
 #ifdef CONFIG_HOTPLUG_CPU
-		if ((cx->type != ACPI_STATE_C1) && (num_online_cpus() > 1) &&
+		if (!acpi_gbl_reduced_hardware &&
+		    (cx->type != ACPI_STATE_C1) && (num_online_cpus() > 1) &&
 		    !pr->flags.has_cst &&
 		    !(acpi_gbl_FADT.flags & ACPI_FADT_C2_MP_SUPPORTED))
 			continue;
@@ -1017,7 +1057,8 @@ static int acpi_processor_setup_cpuidle_states(struct acpi_processor *pr)
 			continue;
 
 #ifdef CONFIG_HOTPLUG_CPU
-		if ((cx->type != ACPI_STATE_C1) && (num_online_cpus() > 1) &&
+		if (!acpi_gbl_reduced_hardware &&
+		    (cx->type != ACPI_STATE_C1) && (num_online_cpus() > 1) &&
 		    !pr->flags.has_cst &&
 		    !(acpi_gbl_FADT.flags & ACPI_FADT_C2_MP_SUPPORTED))
 			continue;
@@ -1175,7 +1216,10 @@ int acpi_processor_power_init(struct acpi_processor *pr)
 
 	if (!first_run) {
 		dmi_check_system(processor_power_dmi_table);
+#ifdef CONFIG_X86
+	/* BOZO: abstract out? */
 		max_cstate = acpi_processor_cstate_check(max_cstate);
+#endif
 		if (max_cstate < ACPI_C_STATES_MAX)
 			printk(KERN_NOTICE
 			       "ACPI: processor limited to max C-state %d\n",

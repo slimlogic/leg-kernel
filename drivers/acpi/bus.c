@@ -79,10 +79,6 @@ static struct dmi_system_id dsdt_dmi_table[] __initdata = {
 	},
 	{}
 };
-#else
-static struct dmi_system_id dsdt_dmi_table[] __initdata = {
-	{}
-};
 #endif
 
 /* --------------------------------------------------------------------------
@@ -479,6 +475,9 @@ static int __init acpi_bus_init_irq(void)
 	case ACPI_IRQ_MODEL_PLATFORM:
 		message = "platform specific model";
 		break;
+	case ACPI_IRQ_MODEL_GIC:
+		message = "GIC";
+		break;
 	default:
 		printk(KERN_WARNING PREFIX "Unknown interrupt routing model\n");
 		return -ENODEV;
@@ -513,11 +512,15 @@ void __init acpi_early_init(void)
 
 	acpi_gbl_permanent_mmap = 1;
 
+#if !(defined(CONFIG_ARM) || defined(CONFIG_ARM64))
 	/*
+	 * NB: ARM does not use DMI at present.
+	 *
 	 * If the machine falls into the DMI check table,
 	 * DSDT will be copied to memory
 	 */
 	dmi_check_system(dsdt_dmi_table);
+#endif
 
 	status = acpi_reallocate_root_table();
 	if (ACPI_FAILURE(status)) {
@@ -540,7 +543,8 @@ void __init acpi_early_init(void)
 		goto error0;
 	}
 
-#ifdef CONFIG_X86
+#if !(defined(CONFIG_ARM) || defined(CONFIG_ARM64)) && (!ACPI_REDUCED_HARDWARE)
+	/* NB: in HW reduced mode, FADT sci_interrupt has no meaning */
 	if (!acpi_ioapic) {
 		/* compatible (0) means level (3) */
 		if (!(acpi_sci_flags & ACPI_MADT_TRIGGER_MASK)) {
