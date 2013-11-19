@@ -24,6 +24,8 @@ SPEAr
 	- ST SPEAr platform Linux Overview
 VFP/
 	- Release notes for Linux Kernel Vector Floating Point support code
+early_ioremap.txt
+	- documentation of the early_ioremap() functionality
 empeg/
 	- Ltd's Empeg MP3 Car Audio Player
 mem_alignment
@@ -34,3 +36,6 @@ nwfpe/
 	- NWFPE floating point emulator documentation
 swp_emulation
 	- SWP/SWPB emulation handler/logging description
+
+uefi.txt
+	- [U]EFI configuration and runtime services documentation
