@@ -466,79 +466,6 @@ static int __init acpi_parse_sbf(struct acpi_table_header *table)
 	return 0;
 }
 
-#ifdef CONFIG_HPET_TIMER
-#include <asm/hpet.h>
-
-static struct __initdata resource * hpet_res;
-
-static int __init acpi_parse_hpet(struct acpi_table_header *table)
-{
-	struct acpi_table_hpet *hpet_tbl;
-
-	hpet_tbl = (struct acpi_table_hpet *)table;
-	if (!hpet_tbl) {
-		printk(KERN_WARNING PREFIX "Unable to map HPET\n");
-		return -ENODEV;
-	}
-
-	if (hpet_tbl->address.space_id != ACPI_SPACE_MEM) {
-		printk(KERN_WARNING PREFIX "HPET timers must be located in "
-		       "memory.\n");
-		return -1;
-	}
-
-	hpet_address = hpet_tbl->address.address;
-	hpet_blockid = hpet_tbl->sequence;
-
-	/*
-	 * Some broken BIOSes advertise HPET at 0x0. We really do not
-	 * want to allocate a resource there.
-	 */
-	if (!hpet_address) {
-		printk(KERN_WARNING PREFIX
-		       "HPET id: %#x base: %#lx is invalid\n",
-		       hpet_tbl->id, hpet_address);
-		return 0;
-	}
-	printk(KERN_INFO PREFIX "HPET id: %#x base: %#lx\n",
-	       hpet_tbl->id, hpet_address);
-
-	/*
-	 * Allocate and initialize the HPET firmware resource for adding into
-	 * the resource tree during the lateinit timeframe.
-	 */
-#define HPET_RESOURCE_NAME_SIZE 9
-	hpet_res = alloc_bootmem(sizeof(*hpet_res) + HPET_RESOURCE_NAME_SIZE);
-
-	hpet_res->name = (void *)&hpet_res[1];
-	hpet_res->flags = IORESOURCE_MEM;
-	snprintf((char *)hpet_res->name, HPET_RESOURCE_NAME_SIZE, "HPET %u",
-		 hpet_tbl->sequence);
-
-	hpet_res->start = hpet_address;
-	hpet_res->end = hpet_address + (1 * 1024) - 1;
-
-	return 0;
-}
-
-/*
- * hpet_insert_resource inserts the HPET resources used into the resource
- * tree.
- */
-static int __init hpet_insert_resource(void)
-{
-	if (!hpet_res)
-		return 1;
-
-	return insert_resource(&iomem_resource, hpet_res);
-}
-
-late_initcall(hpet_insert_resource);
-
-#else
-#define	acpi_parse_hpet	NULL
-#endif
-
 /* Local APIC = GIC cpu interface on ARM */
 static int __init acpi_parse_madt_lapic_entries(void)
 {
@@ -740,8 +667,6 @@ int __init acpi_boot_init(void)
 	 * Process the Multiple APIC Description Table (MADT), if present
 	 */
 	acpi_process_madt();
-
-	acpi_table_parse(ACPI_SIG_HPET, acpi_parse_hpet);
 
 	return 0;
 }
