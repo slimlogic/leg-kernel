@@ -1,5 +1,5 @@
 /*
- *  boot.c - Architecture-Specific Low-Level ACPI Boot Support
+ *  ARM/ARM64 Specific Low-Level ACPI Boot Support
  *
  *  Copyright (C) 2001, 2002 Paul Diefenbaugh <paul.s.diefenbaugh@intel.com>
  *  Copyright (C) 2001 Jun Nakajima <jun.nakajima@intel.com>
