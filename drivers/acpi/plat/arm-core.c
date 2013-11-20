@@ -224,29 +224,6 @@ int acpi_gsi_to_irq(u32 gsi, unsigned int *irq)
 }
 EXPORT_SYMBOL_GPL(acpi_gsi_to_irq);
 
-static int acpi_register_gsi_pic(struct device *dev, u32 gsi,
-				 int trigger, int polarity)
-{
-#ifdef CONFIG_PCI
-	/*
-	 * Make sure all (legacy) PCI IRQs are set as level-triggered.
-	 */
-	if (trigger == ACPI_LEVEL_SENSITIVE)
-		eisa_set_level_irq(gsi);
-#endif
-
-	return gsi;
-}
-
-static int acpi_register_gsi_ioapic(struct device *dev, u32 gsi,
-				    int trigger, int polarity)
-{
-	return gsi;
-}
-
-int (*__acpi_register_gsi)(struct device *dev, u32 gsi,
-			   int trigger, int polarity) = acpi_register_gsi_pic;
-
 /*
  * success: return IRQ number (>=0)
  * failure: return < 0
@@ -255,8 +232,6 @@ int acpi_register_gsi(struct device *dev, u32 gsi, int trigger, int polarity)
 {
 	unsigned int irq;
 	unsigned int plat_gsi = gsi;
-
-	plat_gsi = (*__acpi_register_gsi)(dev, gsi, trigger, polarity);
 
 	irq = gsi_to_irq(plat_gsi);
 
@@ -268,20 +243,6 @@ void acpi_unregister_gsi(u32 gsi)
 {
 }
 EXPORT_SYMBOL_GPL(acpi_unregister_gsi);
-
-void __init acpi_set_irq_model_pic(void)
-{
-	acpi_irq_model = ACPI_IRQ_MODEL_PIC;
-	__acpi_register_gsi = acpi_register_gsi_pic;
-	acpi_ioapic = 0;
-}
-
-void __init acpi_set_irq_model_gic(void)
-{
-	acpi_irq_model = ACPI_IRQ_MODEL_GIC;
-	__acpi_register_gsi = acpi_register_gsi_ioapic;
-	acpi_ioapic = 1;
-}
 
 static int __initdata setup_possible_cpus = -1;
 static int __init _setup_possible_cpus(char *str)
@@ -550,9 +511,7 @@ static void __init acpi_process_madt(void)
 			/*
 			 * Parse MADT IO-APIC entries
 			 */
-			error = acpi_parse_madt_ioapic_entries();
-			if (!error)
-				acpi_set_irq_model_gic();
+			acpi_parse_madt_ioapic_entries();
 		}
 	}
 
