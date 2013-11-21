@@ -71,8 +71,6 @@ int acpi_noirq;				/* skip ACPI IRQ initialization */
 int acpi_pci_disabled;		/* skip ACPI PCI scan and IRQ initialization */
 EXPORT_SYMBOL(acpi_pci_disabled);
 
-int acpi_lapic;
-int acpi_ioapic;
 int acpi_strict;
 
 u8 acpi_sci_flags __initdata;
@@ -506,8 +504,6 @@ static void __init acpi_process_madt(void)
 		 */
 		error = acpi_parse_madt_lapic_entries();
 		if (!error) {
-			acpi_lapic = 1;
-
 			/*
 			 * Parse MADT IO-APIC entries
 			 */
@@ -515,16 +511,7 @@ static void __init acpi_process_madt(void)
 		}
 	}
 
-	/*
-	 * ACPI supports both logical (e.g. Hyper-Threading) and physical
-	 * processors, where MPS only supports physical.
-	 */
-	if (acpi_lapic && acpi_ioapic)
-		pr_info("Using ACPI (MADT) for SMP configuration "
-		       "information\n");
-	else if (acpi_lapic)
-		pr_info("Using ACPI for processor (LAPIC) "
-		       "configuration information\n");
+	pr_info("Using ACPI for processor (GIC) configuration information\n");
 
 	return;
 }
@@ -541,9 +528,6 @@ static void __init acpi_process_madt(void)
  * other side effects.
  *
  * side effects of acpi_boot_init:
- *	acpi_lapic = 1 if LAPIC found
- *	acpi_ioapic = 1 if IOAPIC found
- *	if (acpi_lapic && acpi_ioapic) smp_found_config = 1;
  *	if acpi_blacklisted() acpi_disabled = 1;
  *	acpi_irq_model=...
  *	...
