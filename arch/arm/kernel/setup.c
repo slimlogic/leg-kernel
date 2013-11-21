@@ -30,9 +30,7 @@
 #include <linux/bug.h>
 #include <linux/compiler.h>
 #include <linux/sort.h>
-#ifdef CONFIG_ACPI
 #include <linux/acpi.h>
-#endif
 
 #include <asm/unified.h>
 #include <asm/cp15.h>
