@@ -73,11 +73,6 @@ EXPORT_SYMBOL(acpi_pci_disabled);
 
 int acpi_strict;
 
-u8 acpi_sci_flags __initdata;
-int acpi_sci_override_gsi __initdata;
-int acpi_skip_timer_override __initdata;
-int acpi_use_timer_override __initdata;
-int acpi_fix_pin2_polarity __initdata;
 static u64 acpi_lapic_addr __initdata;
 
 struct acpi_arm_root acpi_arm_rsdp_info;     /* info about RSDP from FDT */
