@@ -41,9 +41,7 @@
 #include <linux/memblock.h>
 #include <linux/of_fdt.h>
 #include <linux/of_platform.h>
-#ifdef CONFIG_ACPI
 #include <linux/acpi.h>
-#endif
 
 #include <asm/fixmap.h>
 #include <asm/cputype.h>
@@ -58,9 +56,7 @@
 #include <asm/memblock.h>
 #include <asm/psci.h>
 #include <asm/cpu.h>
-#ifdef CONFIG_ACPI
 #include <asm/acpi.h>
-#endif
 
 unsigned int processor_id;
 EXPORT_SYMBOL(processor_id);
