@@ -109,12 +109,7 @@ extern int acpi_suspend_lowlevel(void);
 
 extern void prefill_possible_map(void);
 
-/* Physical address to resume after wakeup */
-/* BOZO: was...
-#define acpi_wakeup_address ((unsigned long)(real_mode_header->wakeup_start))
-*/
 #define acpi_wakeup_address (0)
-
 
 static inline void disable_acpi(void)
 {
