@@ -30,10 +30,7 @@
 #include <linux/slab.h>
 #include <acpi/acpi_bus.h>
 #include <acpi/acpi_drivers.h>
-#ifdef CONFIG_X86
-	/* BOZO: abstract out? */
 #include <asm/mwait.h>
-#endif
 
 #define ACPI_PROCESSOR_AGGREGATOR_CLASS	"acpi_pad"
 #define ACPI_PROCESSOR_AGGREGATOR_DEVICE_NAME "Processor Aggregator"
@@ -50,8 +47,6 @@ static unsigned char lapic_marked_unstable;
 
 static void power_saving_mwait_init(void)
 {
-#ifdef CONFIG_X86
-	/* BOZO: abstract out? */
 	unsigned int eax, ebx, ecx, edx;
 	unsigned int highest_cstate = 0;
 	unsigned int highest_subcstate = 0;
@@ -77,9 +72,7 @@ static void power_saving_mwait_init(void)
 	}
 	power_saving_mwait_eax = (highest_cstate << MWAIT_SUBSTATE_SIZE) |
 		(highest_subcstate - 1);
-#endif
 
-#if defined(CONFIG_X86)
 	switch (boot_cpu_data.x86_vendor) {
 	case X86_VENDOR_AMD:
 	case X86_VENDOR_INTEL:
@@ -97,7 +90,6 @@ static void power_saving_mwait_init(void)
 		tsc_detected_unstable = 1;
 		lapic_detected_unstable = 1;
 	}
-#endif
 }
 
 static unsigned long cpu_weight[NR_CPUS];
@@ -179,11 +171,8 @@ static int power_saving_thread(void *data)
 
 		while (!need_resched()) {
 			if (tsc_detected_unstable && !tsc_marked_unstable) {
-#ifdef CONFIG_X86
-				/* BOZO: abstract out? */
 				/* TSC could halt in idle, so notify users */
 				mark_tsc_unstable("TSC halts in idle");
-#endif
 				tsc_marked_unstable = 1;
 			}
 			if (lapic_detected_unstable && !lapic_marked_unstable) {
@@ -202,16 +191,10 @@ static int power_saving_thread(void *data)
 					CLOCK_EVT_NOTIFY_BROADCAST_ENTER, &cpu);
 			stop_critical_timings();
 
-#ifdef CONFIG_X86
-	/* BOZO: abstract out? */
 			__monitor((void *)&current_thread_info()->flags, 0, 0);
-#endif
 			smp_mb();
-#ifdef CONFIG_X86
-	/* BOZO: abstract out? */
 			if (!need_resched())
 				__mwait(power_saving_mwait_eax, 1);
-#endif
 
 			start_critical_timings();
 			if (lapic_marked_unstable)
