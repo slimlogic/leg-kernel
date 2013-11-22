@@ -175,6 +175,7 @@ config ACPI_PROCESSOR
 	select THERMAL
 	select CPU_IDLE
 	default y
+	depends on X86
 	help
 	  This driver installs ACPI as the idle handler for Linux and uses
 	  ACPI C2 and C3 processor states to save power on systems that
@@ -215,7 +216,7 @@ config ACPI_PROCESSOR_AGGREGATOR
 
 config ACPI_THERMAL
 	tristate "Thermal Zone"
-	depends on ACPI_PROCESSOR
+	depends on ACPI_PROCESSOR || ARM || ARM64
 	select THERMAL
 	default y
 	help

@@ -42,9 +42,7 @@
  * asm/acpi.h is not an option, as it would require more include magic. Also
  * creating an empty asm-ia64/apic.h would just trade pest vs. cholera.
  */
-#ifdef CONFIG_X86
 #include <asm/apic.h>
-#endif
 
 #include <acpi/acpi_bus.h>
 #include <acpi/processor.h>
@@ -119,26 +117,17 @@ static struct dmi_system_id processor_power_dmi_table[] = {
  */
 static void acpi_safe_halt(void)
 {
-#ifdef CONFIG_X86
-	/* BOZO: abstract out? */
 	current_thread_info()->status &= ~TS_POLLING;
-#endif
 	/*
 	 * TS_POLLING-cleared state must be visible before we
 	 * test NEED_RESCHED:
 	 */
 	smp_mb();
 	if (!need_resched()) {
-#ifdef CONFIG_X86
-		/* BOZO: abstract out? */
 		safe_halt();
-#endif
 		local_irq_disable();
 	}
-#ifdef CONFIG_X86
-	/* BOZO: abstract out? */
 	current_thread_info()->status |= TS_POLLING;
-#endif
 }
 
 #ifdef ARCH_APICTIMER_STOPS_ON_C3
@@ -809,10 +798,7 @@ static int acpi_idle_enter_simple(struct cpuidle_device *dev,
 		return -EINVAL;
 
 	if (cx->entry_method != ACPI_CSTATE_FFH) {
-#ifdef CONFIG_X86
-		/* BOZO: abstract out? */
 		current_thread_info()->status &= ~TS_POLLING;
-#endif
 		/*
 		 * TS_POLLING-cleared state must be visible before we test
 		 * NEED_RESCHED:
@@ -820,10 +806,7 @@ static int acpi_idle_enter_simple(struct cpuidle_device *dev,
 		smp_mb();
 
 		if (unlikely(need_resched())) {
-#ifdef CONFIG_X86
-			/* BOZO: abstract out? */
 			current_thread_info()->status |= TS_POLLING;
-#endif
 			return -EINVAL;
 		}
 	}
@@ -843,11 +826,8 @@ static int acpi_idle_enter_simple(struct cpuidle_device *dev,
 
 	sched_clock_idle_wakeup_event(0);
 
-#ifdef CONFIG_X86
-	/* BOZO: abstract out? */
 	if (cx->entry_method != ACPI_CSTATE_FFH)
 		current_thread_info()->status |= TS_POLLING;
-#endif
 
 	lapic_timer_state_broadcast(pr, cx, 0);
 	return index;
@@ -886,10 +866,7 @@ static int acpi_idle_enter_bm(struct cpuidle_device *dev,
 	}
 
 	if (cx->entry_method != ACPI_CSTATE_FFH) {
-#ifdef CONFIG_X86
-		/* BOZO: abstract out? */
 		current_thread_info()->status &= ~TS_POLLING;
-#endif
 		/*
 		 * TS_POLLING-cleared state must be visible before we test
 		 * NEED_RESCHED:
@@ -897,18 +874,12 @@ static int acpi_idle_enter_bm(struct cpuidle_device *dev,
 		smp_mb();
 
 		if (unlikely(need_resched())) {
-#ifdef CONFIG_X86
-			/* BOZO: abstract out? */
 			current_thread_info()->status |= TS_POLLING;
-#endif
 			return -EINVAL;
 		}
 	}
 
-#ifdef CONFIG_X86
-	/* BOZO: abstract out? */
 	acpi_unlazy_tlb(smp_processor_id());
-#endif
 
 	/* Tell the scheduler that we are going deep-idle: */
 	sched_clock_idle_sleep_event();
@@ -951,11 +922,8 @@ static int acpi_idle_enter_bm(struct cpuidle_device *dev,
 
 	sched_clock_idle_wakeup_event(0);
 
-#ifdef CONFIG_X86
-	/* BOZO: abstract out? */
 	if (cx->entry_method != ACPI_CSTATE_FFH)
 		current_thread_info()->status |= TS_POLLING;
-#endif
 
 	lapic_timer_state_broadcast(pr, cx, 0);
 	return index;
@@ -1216,10 +1184,7 @@ int acpi_processor_power_init(struct acpi_processor *pr)
 
 	if (!first_run) {
 		dmi_check_system(processor_power_dmi_table);
-#ifdef CONFIG_X86
-	/* BOZO: abstract out? */
 		max_cstate = acpi_processor_cstate_check(max_cstate);
-#endif
 		if (max_cstate < ACPI_C_STATES_MAX)
 			printk(KERN_NOTICE
 			       "ACPI: processor limited to max C-state %d\n",
