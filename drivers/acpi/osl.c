@@ -251,13 +251,15 @@ static int __init setup_acpi_rsdp(char *arg)
 early_param("acpi_rsdp", setup_acpi_rsdp);
 #endif
 
-#if defined(CONFIG_ARM) || defined(CONFIG_ARM64)
+#ifdef CONFIG_ACPI_USE_CHOSEN_NODE
 #include <asm/acpi.h>
 #include <acpi/actbl.h>
 
 void acpi_find_arm_root_pointer(acpi_physical_address *pa)
 {
-	/* BOZO: temporarily clunky.
+	/* This function is for development use only, or in extreme
+	 * cases where UEFI is not yet available for the platform.
+	 *
 	 * What we do is, while using u-boot still, is use the values
 	 * that have already been retrieved from the FDT node
 	 * (/chosen/linux,acpi-start and /chosen/linux,acpi-len) which
@@ -307,7 +309,7 @@ void acpi_find_arm_root_pointer(acpi_physical_address *pa)
 
 	return;
 }
-#endif
+#endif	/* CONFIG_ACPI_USE_CHOSEN_NODE */
 
 acpi_physical_address __init acpi_os_get_root_pointer(void)
 {
@@ -329,7 +331,7 @@ acpi_physical_address __init acpi_os_get_root_pointer(void)
 	} else {
 		acpi_physical_address pa = 0;
 
-#if defined(CONFIG_ARM) || defined(CONFIG_ARM64)
+#ifdef CONFIG_ACPI_USE_CHOSEN_NODE
 		acpi_find_arm_root_pointer(&pa);
 #else
 		acpi_find_root_pointer(&pa);
