@@ -78,6 +78,12 @@ static u64 acpi_lapic_addr __initdata;
 struct acpi_arm_root acpi_arm_rsdp_info;     /* info about RSDP from FDT */
 
 /*
+ * This function pointer is needed to be defined but for now will be NULL
+ * on arm where sleep is handled differently than x86
+ */
+int (*acpi_suspend_lowlevel)(void);
+
+/*
  * Boot-time Configuration
  */
 
