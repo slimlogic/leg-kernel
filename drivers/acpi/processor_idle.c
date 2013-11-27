@@ -207,18 +207,16 @@ static void lapic_timer_state_broadcast(struct acpi_processor *pr,
 
 #endif
 
-#ifdef CONFIG_PM_SLEEP
-#if (!ACPI_REDUCED_HARDWARE)
+#if IS_ENABLED(CONFIG_PM_SLEEP) && !IS_ENABLED(CONFIG_ACPI_REDUCED_HARDWARE)
 static u32 saved_bm_rld;
-#endif
 
-ACPI_HW_DEPENDENT_RETURN_INT(int acpi_processor_suspend(void))
+int acpi_processor_suspend(void)
 {
 	acpi_read_bit_register(ACPI_BITREG_BUS_MASTER_RLD, &saved_bm_rld);
 	return 0;
 }
 
-ACPI_HW_DEPENDENT_RETURN_VOID(void acpi_processor_resume(void))
+void acpi_processor_resume(void)
 {
 	u32 resumed_bm_rld;
 
@@ -243,7 +241,13 @@ void acpi_processor_syscore_exit(void)
 {
 	unregister_syscore_ops(&acpi_processor_syscore_ops);
 }
-#endif /* CONFIG_PM_SLEEP */
+
+#else
+
+void acpi_processor_syscore_init(void){}
+void acpi_processor_syscore_exit(void){}
+
+#endif /* CONFIG_PM_SLEEP && !CONFIG_ACPI_REDUCED_HARDWARE */
 
 #if defined(CONFIG_X86)
 static void tsc_check_state(int state)
