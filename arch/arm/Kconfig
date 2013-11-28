@@ -1888,6 +1888,20 @@ config EARLY_IOREMAP
 	  the same virtual memory range as kmap so all early mappings must
 	  be unapped before paging_init() is called.
 
+config EFI
+	bool "UEFI runtime service support"
+	depends on OF && !CPU_BIG_ENDIAN
+	select UCS2_STRING
+	select EARLY_IOREMAP
+	select UEFI_PARAMS_FROM_FDT
+	---help---
+	  This enables the kernel to use UEFI runtime services that are
+	  available (such as the UEFI variable services).
+
+	  This option is only useful on systems that have UEFI firmware.
+	  However, even with this option, the resultant kernel will
+	  continue to boot on non-UEFI platforms.
+
 config EFI_STUB
 	bool "EFI stub support"
 	depends on EFI && !CPU_BIG_ENDIAN
@@ -2306,6 +2320,8 @@ endmenu
 source "net/Kconfig"
 
 source "drivers/Kconfig"
+
+source "drivers/firmware/Kconfig"
 
 source "fs/Kconfig"
 
