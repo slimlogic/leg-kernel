@@ -1237,7 +1237,7 @@ static struct of_device_id armpmu_of_device_ids[] = {
 
 #ifdef CONFIG_ACPI
 static const struct acpi_device_id armpmu_acpi_match[] = {
-	{ "LINA0007", },
+	{ "LNRO0007", },
 	{},
 };
 #endif
