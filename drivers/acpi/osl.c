@@ -283,7 +283,6 @@ void acpi_find_arm_root_pointer(acpi_physical_address *pa)
 	}
 
 	address = phys_to_virt(acpi_arm_rsdp_info.phys_address);
-	address += ACPI_BLOB_HEADER_SIZE;
 	*pa = (acpi_physical_address)address;
 
 	rp = (struct acpi_table_rsdp *)address;
