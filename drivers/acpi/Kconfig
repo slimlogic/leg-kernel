@@ -2,13 +2,18 @@
 # ACPI Configuration
 #
 
+config ACPI_ARM
+	bool
+	select EARLY_IOREMAP
+	select ACPI_REDUCED_HARDWARE
+
 menuconfig ACPI
 	bool "ACPI (Advanced Configuration and Power Interface) Support"
 	depends on !IA64_HP_SIM
-	depends on IA64 || X86
-	depends on PCI
+	depends on ((IA64 || X86) && PCI) || (ARM || ARM64)
 	select PNP
-	default y
+	select ACPI_ARM if (ARM || ARM64)
+	default y if !(ARM || ARM64)
 	help
 	  Advanced Configuration and Power Interface (ACPI) support for 
 	  Linux requires an ACPI-compliant platform (hardware/firmware),
@@ -46,6 +51,7 @@ config ACPI_SLEEP
 config ACPI_PROCFS
 	bool "Deprecated /proc/acpi files"
 	depends on PROC_FS
+	depends on IA64 || X86
 	help
 	  For backwards compatibility, this option allows
 	  deprecated /proc/acpi/ files to exist, even when
@@ -59,6 +65,7 @@ config ACPI_PROCFS
 config ACPI_PROCFS_POWER
 	bool "Deprecated power /proc/acpi directories"
 	depends on PROC_FS
+	depends on IA64 || X86
 	help
 	  For backwards compatibility, this option allows
           deprecated power /proc/acpi/ directories to exist, even when
@@ -93,9 +100,9 @@ config ACPI_EC_DEBUGFS
 
 config ACPI_AC
 	tristate "AC Adapter"
-	depends on X86
+	depends on X86 || ARM || ARM64
 	select POWER_SUPPLY
-	default y
+	default y if !(ARM || ARM64)
 	help
 	  This driver supports the AC Adapter object, which indicates
 	  whether a system is on AC or not.  If you have a system that can
@@ -106,9 +113,9 @@ config ACPI_AC
 
 config ACPI_BATTERY
 	tristate "Battery"
-	depends on X86
+	depends on X86 || ARM || ARM64
 	select POWER_SUPPLY
-	default y
+	default y if !(ARM || ARM64)
 	help
 	  This driver adds support for battery information through
 	  /proc/acpi/battery. If you have a mobile system with a battery, 
@@ -132,7 +139,8 @@ config ACPI_BUTTON
 
 config ACPI_VIDEO
 	tristate "Video"
-	depends on X86 && BACKLIGHT_CLASS_DEVICE && VIDEO_OUTPUT_CONTROL
+	depends on (X86 || (ARM || ARM64)) && \
+                   BACKLIGHT_CLASS_DEVICE && VIDEO_OUTPUT_CONTROL
 	depends on INPUT
 	select THERMAL
 	help
@@ -167,6 +175,7 @@ config ACPI_PROCESSOR
 	select THERMAL
 	select CPU_IDLE
 	default y
+	depends on X86
 	help
 	  This driver installs ACPI as the idle handler for Linux and uses
 	  ACPI C2 and C3 processor states to save power on systems that
@@ -175,6 +184,7 @@ config ACPI_PROCESSOR
 
 	  To compile this driver as a module, choose M here:
 	  the module will be called processor.
+
 config ACPI_IPMI
 	tristate "IPMI"
 	depends on IPMI_SI && IPMI_HANDLER
@@ -206,7 +216,7 @@ config ACPI_PROCESSOR_AGGREGATOR
 
 config ACPI_THERMAL
 	tristate "Thermal Zone"
-	depends on ACPI_PROCESSOR
+	depends on ACPI_PROCESSOR || ARM || ARM64
 	select THERMAL
 	default y
 	help
@@ -221,7 +231,7 @@ config ACPI_THERMAL
 config ACPI_NUMA
 	bool "NUMA support"
 	depends on NUMA
-	depends on (X86 || IA64)
+	depends on (X86 || IA64 || ARM64)
 	default y if IA64_GENERIC || IA64_SGI_SN2
 
 config ACPI_CUSTOM_DSDT_FILE
@@ -262,6 +272,16 @@ config ACPI_BLACKLIST_YEAR
 	  Enter 0 to disable this mechanism and allow ACPI to
 	  run by default no matter what the year.  (default)
 
+config ACPI_SCI_EMULATE
+        bool "ACPI SCI Event Emulation Support"
+        depends on DEBUG_FS
+	default n
+	help
+	  This will enable your system to emulate sci hotplug event
+	  notification through proc file system. For example user needs to
+	  echo "XXX 0" > /sys/kernel/debug/acpi/sci_notify (where, XXX is
+	  a target ACPI device object name present under \_SB scope).
+
 config ACPI_DEBUG
 	bool "Debug Statements"
 	default n
@@ -277,6 +297,7 @@ config ACPI_DEBUG
 config ACPI_PCI_SLOT
 	bool "PCI slot detection driver"
 	depends on SYSFS
+	depends on PCI
 	default n
 	help
 	  This driver creates entries in /sys/bus/pci/slots/ for all PCI
@@ -330,7 +351,7 @@ config ACPI_HOTPLUG_MEMORY
 
 config ACPI_SBS
 	tristate "Smart Battery System"
-	depends on X86
+	depends on X86 || ARM || ARM64
 	select POWER_SUPPLY
 	help
 	  This driver supports the Smart Battery System, another
@@ -369,6 +390,14 @@ config ACPI_BGRT
 	  Resource Table, which allows the operating system to obtain
 	  data from the firmware boot splash. It will appear under
 	  /sys/firmware/acpi/bgrt/ .
+
+config ACPI_REDUCED_HARDWARE
+	bool "Hardware-reduced ACPI support"
+	depends on !(IA64 || X86)
+	help
+	This config adds support for Hardware-reduced ACPI. When this option
+	is selected, will generate a specialized version of ACPICA that ONLY
+	supports the ACPI "reduced hardware".
 
 source "drivers/acpi/apei/Kconfig"
 

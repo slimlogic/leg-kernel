@@ -186,7 +186,8 @@ acpi_status acpi_get_system_info(struct acpi_buffer * out_buffer)
 
 	/* Timer resolution - 24 or 32 bits  */
 
-	if (acpi_gbl_FADT.flags & ACPI_FADT_32BIT_TIMER) {
+	if (!acpi_gbl_reduced_hardware &&
+	    (acpi_gbl_FADT.flags & ACPI_FADT_32BIT_TIMER)) {
 		info_ptr->timer_resolution = 24;
 	} else {
 		info_ptr->timer_resolution = 32;

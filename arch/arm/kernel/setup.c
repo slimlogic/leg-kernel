@@ -31,6 +31,7 @@
 #include <linux/compiler.h>
 #include <linux/sort.h>
 #include <linux/efi.h>
+#include <linux/acpi.h>
 
 #include <asm/unified.h>
 #include <asm/cp15.h>
@@ -886,8 +887,21 @@ void __init setup_arch(char **cmdline_p)
 	sanity_check_meminfo();
 	arm_memblock_init(&meminfo, mdesc);
 
+#ifdef CONFIG_ACPI
+	arm_acpi_reserve_memory();
+#endif
+
 #ifdef CONFIG_EFI
 	efi_memblock_arm_reserve_range();
+#endif
+
+#ifdef CONFIG_ACPI
+	/*
+	 * Parse the ACPI tables for possible boot-time configuration
+	 */
+	acpi_boot_table_init();
+	early_acpi_boot_init();
+	acpi_boot_init();
 #endif
 
 	paging_init(mdesc);
@@ -933,21 +947,6 @@ void __init setup_arch(char **cmdline_p)
 	if (mdesc->init_early)
 		mdesc->init_early();
 }
-
-
-static int __init topology_init(void)
-{
-	int cpu;
-
-	for_each_possible_cpu(cpu) {
-		struct cpuinfo_arm *cpuinfo = &per_cpu(cpu_data, cpu);
-		cpuinfo->cpu.hotpluggable = 1;
-		register_cpu(&cpuinfo->cpu, cpu);
-	}
-
-	return 0;
-}
-subsys_initcall(topology_init);
 
 #ifdef CONFIG_HAVE_PROC_CPU
 static int __init proc_cpu_init(void)
