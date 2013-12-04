@@ -1,0 +1,8 @@
+
+efi/fdt.h
+efi/libfdt.h
+efi/libfdt_internal.h
+efi/fdt_rw.c
+efi/fdt_ro.c
+efi/fdt_wip.c
+efi/fdt.c
