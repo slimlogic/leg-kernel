@@ -47,11 +47,7 @@
 		status = "okay";
 	};
 
-	usbctl@3f130000 {
-		status = "okay";
-	};
-
-	usbphy {
+	usbphy@3f130000 {
 		status = "okay";
 	};
 };

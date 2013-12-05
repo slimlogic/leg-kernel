@@ -291,18 +291,15 @@
 		interrupts = <GIC_SPI 47 IRQ_TYPE_LEVEL_HIGH>;
 		clocks = <&usb_otg_ahb_clk>;
 		clock-names = "otg";
-		snps,phy-utmi-width = <8>;
+		phys = <&usbphy>;
+		phy-names = "usb2-phy";
 		status = "disabled";
 	};
 
-	usbctl: usbctl@3f130000 {
-		compatible = "brcm,kona-ctrl-usb";
+	usbphy: usbphy@3f130000 {
+		compatible = "brcm,kona-usb2-phy";
 		reg = <0x3f130000 0x28>;
-		status = "disabled";
-	};
-
-	usbphy: usbphy {
-		compatible = "brcm,kona-usb2";
+		#phy-cells = <0>;
 		status = "disabled";
 	};
 };

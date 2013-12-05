@@ -18,7 +18,6 @@
 #include <linux/string.h>
 #include <linux/errno.h>
 #include <linux/slab.h>
-#include <linux/random.h>
 
 #include <asm/setup.h>  /* for COMMAND_LINE_SIZE */
 #ifdef CONFIG_PPC
@@ -797,7 +796,6 @@ int __init early_init_dt_scan_acpi(unsigned long node, const char *uname,
 	unsigned long l;
 	unsigned int *p;
 	struct acpi_arm_root *pinfo;
-	unsigned char *sig;
 
 	pr_debug("search \"chosen\" for acpi info, depth: %d, uname: %s\n",
 			depth, uname);
@@ -839,14 +837,3 @@ void __init unflatten_device_tree(void)
 }
 
 #endif /* CONFIG_OF_EARLY_FLATTREE */
-
-/* Feed entire flattened device tree into the random pool */
-static int __init add_fdt_randomness(void)
-{
-	if (initial_boot_params)
-		add_device_randomness(initial_boot_params,
-				be32_to_cpu(initial_boot_params->totalsize));
-
-	return 0;
-}
-core_initcall(add_fdt_randomness);

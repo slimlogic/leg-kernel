@@ -42,9 +42,7 @@
 #include <linux/of_fdt.h>
 #include <linux/of_platform.h>
 #include <linux/efi.h>
-#ifdef CONFIG_ACPI
 #include <linux/acpi.h>
-#endif
 
 #include <asm/fixmap.h>
 #include <asm/cputype.h>
@@ -59,9 +57,8 @@
 #include <asm/memblock.h>
 #include <asm/psci.h>
 #include <asm/efi.h>
-#ifdef CONFIG_ACPI
+#include <asm/cpu.h>
 #include <asm/acpi.h>
-#endif
 
 unsigned int processor_id;
 EXPORT_SYMBOL(processor_id);
@@ -273,7 +270,9 @@ void __init setup_arch(char **cmdline_p)
 #ifdef CONFIG_ACPI
 	arm_acpi_reserve_memory();
 #endif
+
 	efi_init();
+
 #ifdef CONFIG_ACPI
 	/*
 	 * Parse the ACPI tables for possible boot-time configuration
@@ -317,16 +316,16 @@ static int __init arm64_device_init(void)
 }
 arch_initcall(arm64_device_init);
 
-static DEFINE_PER_CPU(struct cpu, cpu_data);
+DEFINE_PER_CPU(struct cpuinfo_arm, cpu_data);
 
 static int __init topology_init(void)
 {
 	int i;
 
 	for_each_possible_cpu(i) {
-		struct cpu *cpu = &per_cpu(cpu_data, i);
-		cpu->hotpluggable = 1;
-		register_cpu(cpu, i);
+		struct cpuinfo_arm *cpuinfo = &per_cpu(cpu_data, i);
+		cpuinfo->cpu.hotpluggable = 1;
+		register_cpu(&cpuinfo->cpu, i);
 	}
 
 	return 0;

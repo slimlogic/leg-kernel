@@ -512,9 +512,9 @@ void __init acpi_early_init(void)
 
 	acpi_gbl_permanent_mmap = 1;
 
-#ifdef CONFIG_X86
+#if !(defined(CONFIG_ARM) || defined(CONFIG_ARM64))
 	/*
-	 * NB: ARM does not use DMI; only older Intel products do.
+	 * NB: ARM does not use DMI at present.
 	 *
 	 * If the machine falls into the DMI check table,
 	 * DSDT will be copied to memory
@@ -543,7 +543,8 @@ void __init acpi_early_init(void)
 		goto error0;
 	}
 
-#ifdef CONFIG_X86
+#if !(defined(CONFIG_ARM) || defined(CONFIG_ARM64)) && (!ACPI_REDUCED_HARDWARE)
+	/* NB: in HW reduced mode, FADT sci_interrupt has no meaning */
 	if (!acpi_ioapic) {
 		/* compatible (0) means level (3) */
 		if (!(acpi_sci_flags & ACPI_MADT_TRIGGER_MASK)) {

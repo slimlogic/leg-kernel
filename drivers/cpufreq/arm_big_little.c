@@ -34,18 +34,27 @@
 
 #include "arm_big_little.h"
 
+/* Currently we support only two clusters */
+#define A15_CLUSTER	0
+#define A7_CLUSTER	1
+#define MAX_CLUSTERS	2
+
 #ifdef CONFIG_BL_SWITCHER
-bool bL_switching_enabled;
+static bool bL_switching_enabled;
+#define is_bL_switching_enabled()	bL_switching_enabled
+#define set_switching_enabled(x)	(bL_switching_enabled = (x))
+#else
+#define is_bL_switching_enabled()	false
+#define set_switching_enabled(x)	do { } while (0)
 #endif
 
-#define ACTUAL_FREQ(cluster, freq)	((cluster == A7_CLUSTER) ? freq << 1 : freq)
-#define VIRT_FREQ(cluster, freq)	((cluster == A7_CLUSTER) ? freq >> 1 : freq)
+#define ACTUAL_FREQ(cluster, freq)  ((cluster == A7_CLUSTER) ? freq << 1 : freq)
+#define VIRT_FREQ(cluster, freq)    ((cluster == A7_CLUSTER) ? freq >> 1 : freq)
 
 static struct cpufreq_arm_bL_ops *arm_bL_ops;
 static struct clk *clk[MAX_CLUSTERS];
 static struct cpufreq_frequency_table *freq_table[MAX_CLUSTERS + 1];
-static atomic_t cluster_usage[MAX_CLUSTERS + 1] = {ATOMIC_INIT(0),
-	ATOMIC_INIT(0)};
+static atomic_t cluster_usage[MAX_CLUSTERS + 1];
 
 static unsigned int clk_big_min;	/* (Big) clock frequencies */
 static unsigned int clk_little_max;	/* Maximum clock frequency (Little) */
@@ -54,6 +63,17 @@ static DEFINE_PER_CPU(unsigned int, physical_cluster);
 static DEFINE_PER_CPU(unsigned int, cpu_last_req_freq);
 
 static struct mutex cluster_lock[MAX_CLUSTERS];
+
+static inline int raw_cpu_to_cluster(int cpu)
+{
+	return topology_physical_package_id(cpu);
+}
+
+static inline int cpu_to_cluster(int cpu)
+{
+	return is_bL_switching_enabled() ?
+		MAX_CLUSTERS : raw_cpu_to_cluster(cpu);
+}
 
 static unsigned int find_cluster_maxfreq(int cluster)
 {
@@ -79,7 +99,7 @@ static unsigned int clk_get_cpu_rate(unsigned int cpu)
 	u32 cur_cluster = per_cpu(physical_cluster, cpu);
 	u32 rate = clk_get_rate(clk[cur_cluster]) / 1000;
 
-	/* For switcher we use virtual A15 clock rates */
+	/* For switcher we use virtual A7 clock rates */
 	if (is_bL_switching_enabled())
 		rate = VIRT_FREQ(cur_cluster, rate);
 
@@ -291,13 +311,14 @@ static int merge_cluster_tables(void)
 
 static void _put_cluster_clk_and_freq_table(struct device *cpu_dev)
 {
-	u32 cluster = cpu_to_cluster(cpu_dev->id);
+	u32 cluster = raw_cpu_to_cluster(cpu_dev->id);
 
-	if (!atomic_dec_return(&cluster_usage[cluster])) {
-		clk_put(clk[cluster]);
-		opp_free_cpufreq_table(cpu_dev, &freq_table[cluster]);
-		dev_dbg(cpu_dev, "%s: cluster: %d\n", __func__, cluster);
-	}
+	if (!freq_table[cluster])
+		return;
+
+	clk_put(clk[cluster]);
+	opp_free_cpufreq_table(cpu_dev, &freq_table[cluster]);
+	dev_dbg(cpu_dev, "%s: cluster: %d\n", __func__, cluster);
 }
 
 static void put_cluster_clk_and_freq_table(struct device *cpu_dev)
@@ -305,13 +326,13 @@ static void put_cluster_clk_and_freq_table(struct device *cpu_dev)
 	u32 cluster = cpu_to_cluster(cpu_dev->id);
 	int i;
 
+	if (atomic_dec_return(&cluster_usage[cluster]))
+		return;
+
 	if (cluster < MAX_CLUSTERS)
 		return _put_cluster_clk_and_freq_table(cpu_dev);
 
-	if (atomic_dec_return(&cluster_usage[MAX_CLUSTERS]))
-		return;
-
-	for (i = 0; i < MAX_CLUSTERS; i++) {
+	for_each_present_cpu(i) {
 		struct device *cdev = get_cpu_device(i);
 		if (!cdev) {
 			pr_err("%s: failed to get cpu%d device\n", __func__, i);
@@ -322,30 +343,30 @@ static void put_cluster_clk_and_freq_table(struct device *cpu_dev)
 	}
 
 	/* free virtual table */
-	kfree(freq_table[MAX_CLUSTERS]);
+	kfree(freq_table[cluster]);
 }
 
 static int _get_cluster_clk_and_freq_table(struct device *cpu_dev)
 {
-	u32 cluster = cpu_to_cluster(cpu_dev->id);
+	u32 cluster = raw_cpu_to_cluster(cpu_dev->id);
 	char name[14] = "cpu-cluster.";
 	int ret;
 
-	if (atomic_inc_return(&cluster_usage[cluster]) != 1)
+	if (freq_table[cluster])
 		return 0;
 
 	ret = arm_bL_ops->init_opp_table(cpu_dev);
 	if (ret) {
 		dev_err(cpu_dev, "%s: init_opp_table failed, cpu: %d, err: %d\n",
 				__func__, cpu_dev->id, ret);
-		goto atomic_dec;
+		goto out;
 	}
 
 	ret = opp_init_cpufreq_table(cpu_dev, &freq_table[cluster]);
 	if (ret) {
 		dev_err(cpu_dev, "%s: failed to init cpufreq table, cpu: %d, err: %d\n",
 				__func__, cpu_dev->id, ret);
-		goto atomic_dec;
+		goto out;
 	}
 
 	name[12] = cluster + '0';
@@ -362,8 +383,7 @@ static int _get_cluster_clk_and_freq_table(struct device *cpu_dev)
 	ret = PTR_ERR(clk[cluster]);
 	opp_free_cpufreq_table(cpu_dev, &freq_table[cluster]);
 
-atomic_dec:
-	atomic_dec(&cluster_usage[cluster]);
+out:
 	dev_err(cpu_dev, "%s: Failed to get data for cluster: %d\n", __func__,
 			cluster);
 	return ret;
@@ -374,17 +394,21 @@ static int get_cluster_clk_and_freq_table(struct device *cpu_dev)
 	u32 cluster = cpu_to_cluster(cpu_dev->id);
 	int i, ret;
 
-	if (cluster < MAX_CLUSTERS)
-		return _get_cluster_clk_and_freq_table(cpu_dev);
-
-	if (atomic_inc_return(&cluster_usage[MAX_CLUSTERS]) != 1)
+	if (atomic_inc_return(&cluster_usage[cluster]) != 1)
 		return 0;
+
+	if (cluster < MAX_CLUSTERS) {
+		ret = _get_cluster_clk_and_freq_table(cpu_dev);
+		if (ret)
+			atomic_dec(&cluster_usage[cluster]);
+		return ret;
+	}
 
 	/*
 	 * Get data for all clusters and fill virtual cluster with a merge of
 	 * both
 	 */
-	for (i = 0; i < MAX_CLUSTERS; i++) {
+	for_each_present_cpu(i) {
 		struct device *cdev = get_cpu_device(i);
 		if (!cdev) {
 			pr_err("%s: failed to get cpu%d device\n", __func__, i);
@@ -410,7 +434,7 @@ static int get_cluster_clk_and_freq_table(struct device *cpu_dev)
 	return 0;
 
 put_clusters:
-	while (i--) {
+	for_each_present_cpu(i) {
 		struct device *cdev = get_cpu_device(i);
 		if (!cdev) {
 			pr_err("%s: failed to get cpu%d device\n", __func__, i);
@@ -420,7 +444,7 @@ put_clusters:
 		_put_cluster_clk_and_freq_table(cdev);
 	}
 
-	atomic_dec(&cluster_usage[MAX_CLUSTERS]);
+	atomic_dec(&cluster_usage[cluster]);
 
 	return ret;
 }
@@ -477,6 +501,23 @@ static int bL_cpufreq_init(struct cpufreq_policy *policy)
 	return 0;
 }
 
+static int bL_cpufreq_exit(struct cpufreq_policy *policy)
+{
+	struct device *cpu_dev;
+
+	cpu_dev = get_cpu_device(policy->cpu);
+	if (!cpu_dev) {
+		pr_err("%s: failed to get cpu%d device\n", __func__,
+				policy->cpu);
+		return -ENODEV;
+	}
+
+	put_cluster_clk_and_freq_table(cpu_dev);
+	dev_dbg(cpu_dev, "%s: Exited, cpu: %d\n", __func__, policy->cpu);
+
+	return 0;
+}
+
 /* Export freq_table to sysfs */
 static struct freq_attr *bL_cpufreq_attr[] = {
 	&cpufreq_freq_attr_scaling_available_freqs,
@@ -490,6 +531,7 @@ static struct cpufreq_driver bL_cpufreq_driver = {
 	.target			= bL_cpufreq_set_target,
 	.get			= bL_cpufreq_get_rate,
 	.init			= bL_cpufreq_init,
+	.exit			= bL_cpufreq_exit,
 	.have_governor_per_policy = true,
 	.attr			= bL_cpufreq_attr,
 };
@@ -584,25 +626,6 @@ void bL_cpufreq_unregister(struct cpufreq_arm_bL_ops *ops)
 	bL_switcher_put_enabled();
 	pr_info("%s: Un-registered platform driver: %s\n", __func__,
 			arm_bL_ops->name);
-
-	/* For saving table get/put on every cpu in/out */
-	if (is_bL_switching_enabled()) {
-		put_cluster_clk_and_freq_table(get_cpu_device(0));
-	} else {
-		int i;
-
-		for (i = 0; i < MAX_CLUSTERS; i++) {
-			struct device *cdev = get_cpu_device(i);
-			if (!cdev) {
-				pr_err("%s: failed to get cpu%d device\n",
-						__func__, i);
-				return;
-			}
-
-			put_cluster_clk_and_freq_table(cdev);
-		}
-	}
-
 	arm_bL_ops = NULL;
 }
 EXPORT_SYMBOL_GPL(bL_cpufreq_unregister);

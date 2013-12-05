@@ -34,6 +34,7 @@
 #include <linux/usb/ch9.h>
 #include <linux/usb/gadget.h>
 #include <linux/usb/phy.h>
+#include <linux/phy/phy.h>
 #include <linux/platform_data/s3c-hsotg.h>
 
 #include "s3c-hsotg.h"
@@ -131,7 +132,8 @@ struct s3c_hsotg_ep {
  * struct s3c_hsotg - driver state.
  * @dev: The parent device supplied to the probe function
  * @driver: USB gadget driver
- * @phy: The otg phy transceiver structure for phy control.
+ * @phy: The otg phy transceiver structure for old USB phy control.
+ * @gphy: The otg phy transceiver structure for generic phy control.
  * @plat: The platform specific configuration data. This can be removed once
  * all SoCs support usb transceiver.
  * @regs: The memory area mapped for accessing registers.
@@ -155,6 +157,7 @@ struct s3c_hsotg {
 	struct device		 *dev;
 	struct usb_gadget_driver *driver;
 	struct usb_phy		*phy;
+	struct phy		*gphy;
 	struct s3c_hsotg_plat	 *plat;
 
 	spinlock_t              lock;
@@ -2822,9 +2825,12 @@ static void s3c_hsotg_phy_enable(struct s3c_hsotg *hsotg)
 
 	dev_dbg(hsotg->dev, "pdev 0x%p\n", pdev);
 
-	if (hsotg->phy)
+	if (hsotg->gphy) {
+		phy_init(hsotg->gphy);
+		phy_power_on(hsotg->gphy);
+	} else if (hsotg->phy) {
 		usb_phy_init(hsotg->phy);
-	else if (hsotg->plat->phy_init)
+	} else if (hsotg->plat->phy_init)
 		hsotg->plat->phy_init(pdev, hsotg->plat->phy_type);
 }
 
@@ -2839,9 +2845,12 @@ static void s3c_hsotg_phy_disable(struct s3c_hsotg *hsotg)
 {
 	struct platform_device *pdev = to_platform_device(hsotg->dev);
 
-	if (hsotg->phy)
+	if (hsotg->gphy) {
+		phy_power_off(hsotg->gphy);
+		phy_exit(hsotg->gphy);
+	} else if (hsotg->phy) {
 		usb_phy_shutdown(hsotg->phy);
-	else if (hsotg->plat->phy_exit)
+	} else if (hsotg->plat->phy_exit)
 		hsotg->plat->phy_exit(pdev, hsotg->plat->phy_type);
 }
 
@@ -3448,12 +3457,11 @@ static int s3c_hsotg_probe(struct platform_device *pdev)
 {
 	struct s3c_hsotg_plat *plat = dev_get_platdata(&pdev->dev);
 	struct usb_phy *phy;
+	struct phy *gphy;
 	struct device *dev = &pdev->dev;
-	struct device_node *np = dev->of_node;
 	struct s3c_hsotg_ep *eps;
 	struct s3c_hsotg *hsotg;
 	struct resource *res;
-	u32 phy_utmi_width = 16;
 	int epnum;
 	int ret;
 	int i;
@@ -3464,19 +3472,27 @@ static int s3c_hsotg_probe(struct platform_device *pdev)
 		return -ENOMEM;
 	}
 
-	phy = devm_usb_get_phy(dev, USB_PHY_TYPE_USB2);
-	if (IS_ERR(phy)) {
-		/* Fallback for pdata */
-		plat = dev_get_platdata(&pdev->dev);
-		if (!plat) {
-			dev_err(&pdev->dev, "no platform data or transceiver defined\n");
-			return -EPROBE_DEFER;
-		} else {
-			hsotg->plat = plat;
-		}
-	} else {
-		hsotg->phy = phy;
-	}
+	/*
+	 * Attempt to find a generic PHY, then look for an old style
+	 *  USB PHY, finally fall back to pdata
+	 */
+	gphy = devm_phy_get(dev, "usb2-phy");
+	if (IS_ERR(gphy)) {
+		phy = devm_usb_get_phy(dev, USB_PHY_TYPE_USB2);
+		if (IS_ERR(phy)) {
+			/* Fallback for pdata */
+			plat = dev_get_platdata(&pdev->dev);
+			if (!plat) {
+				dev_err(&pdev->dev,
+					"no platform data or transceiver defined\n");
+				return -EPROBE_DEFER;
+			} else {
+				hsotg->plat = plat;
+			}
+		} else
+			hsotg->phy = phy;
+	} else
+		hsotg->gphy = gphy;
 
 	hsotg->dev = dev;
 
@@ -3545,14 +3561,13 @@ static int s3c_hsotg_probe(struct platform_device *pdev)
 
 	/* Set default UTMI width */
 	hsotg->phyif = GUSBCFG_PHYIf16;
-	if (np) {
-		of_property_read_u32(np, "snps,phy-utmi-width",
-				     &phy_utmi_width);
-		if (phy_utmi_width == 8)
-			hsotg->phyif = GUSBCFG_PHYIf8;
-		if ((phy_utmi_width != 8) && (phy_utmi_width != 16))
-			dev_warn(dev, "invalid snps,phy-utmi-width value\n");
-	}
+
+	/*
+	 * If using the generic PHY framework, check if the PHY bus
+	 * width is 8-bit and set the phyif appropriately.
+	 */
+	if (hsotg->gphy && (phy_get_bus_width(gphy) == 8))
+		hsotg->phyif = GUSBCFG_PHYIf8;
 
 	/* usb phy enable */
 	s3c_hsotg_phy_enable(hsotg);

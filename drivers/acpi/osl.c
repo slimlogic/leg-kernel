@@ -85,6 +85,7 @@ static int (*__acpi_os_prepare_extended_sleep)(u8 sleep_state, u32 val_a,
 
 static acpi_osd_handler acpi_irq_handler;
 static void *acpi_irq_context;
+static u32 acpi_irq_number;
 static struct workqueue_struct *kacpid_wq;
 static struct workqueue_struct *kacpi_notify_wq;
 static struct workqueue_struct *kacpi_hotplug_wq;
@@ -160,6 +161,9 @@ static u32 acpi_osi_handler(acpi_string interface, u32 supported)
 	return supported;
 }
 
+#ifdef CONFIG_ACPI_REDUCED_HARDWARE
+static int __init acpi_reserve_resources(void) { return 0; }
+#else
 static void __init acpi_request_region (struct acpi_generic_address *gas,
 	unsigned int length, char *desc)
 {
@@ -209,6 +213,7 @@ static int __init acpi_reserve_resources(void)
 
 	return 0;
 }
+#endif
 device_initcall(acpi_reserve_resources);
 
 void acpi_os_printf(const char *fmt, ...)
@@ -246,13 +251,15 @@ static int __init setup_acpi_rsdp(char *arg)
 early_param("acpi_rsdp", setup_acpi_rsdp);
 #endif
 
-#if defined(CONFIG_ARM) || defined(CONFIG_ARM64)
+#ifdef CONFIG_ACPI_USE_CHOSEN_NODE
 #include <asm/acpi.h>
 #include <acpi/actbl.h>
 
 void acpi_find_arm_root_pointer(acpi_physical_address *pa)
 {
-	/* BOZO: temporarily clunky.
+	/* This function is for development use only, or in extreme
+	 * cases where UEFI is not yet available for the platform.
+	 *
 	 * What we do is, while using u-boot still, is use the values
 	 * that have already been retrieved from the FDT node
 	 * (/chosen/linux,acpi-start and /chosen/linux,acpi-len) which
@@ -276,7 +283,6 @@ void acpi_find_arm_root_pointer(acpi_physical_address *pa)
 	}
 
 	address = phys_to_virt(acpi_arm_rsdp_info.phys_address);
-	address += ACPI_BLOB_HEADER_SIZE;
 	*pa = (acpi_physical_address)address;
 
 	rp = (struct acpi_table_rsdp *)address;
@@ -302,7 +308,7 @@ void acpi_find_arm_root_pointer(acpi_physical_address *pa)
 
 	return;
 }
-#endif
+#endif	/* CONFIG_ACPI_USE_CHOSEN_NODE */
 
 acpi_physical_address __init acpi_os_get_root_pointer(void)
 {
@@ -324,7 +330,7 @@ acpi_physical_address __init acpi_os_get_root_pointer(void)
 	} else {
 		acpi_physical_address pa = 0;
 
-#if defined(CONFIG_ARM) || defined(CONFIG_ARM64)
+#ifdef CONFIG_ACPI_USE_CHOSEN_NODE
 		acpi_find_arm_root_pointer(&pa);
 #else
 		acpi_find_root_pointer(&pa);
@@ -841,9 +847,9 @@ acpi_os_install_interrupt_handler(u32 gsi, acpi_osd_handler handler,
 
 	/*
 	 * ACPI interrupts different from the SCI in our copy of the FADT are
-	 * not supported.
+	 * not supported, except in HW reduced mode.
 	 */
-	if (gsi != acpi_gbl_FADT.sci_interrupt)
+	if (!acpi_gbl_reduced_hardware && (gsi != acpi_gbl_FADT.sci_interrupt))
 		return AE_BAD_PARAMETER;
 
 	if (acpi_irq_handler)
@@ -862,13 +868,14 @@ acpi_os_install_interrupt_handler(u32 gsi, acpi_osd_handler handler,
 		acpi_irq_handler = NULL;
 		return AE_NOT_ACQUIRED;
 	}
+	acpi_irq_number = irq;
 
 	return AE_OK;
 }
 
 acpi_status acpi_os_remove_interrupt_handler(u32 irq, acpi_osd_handler handler)
 {
-	if (irq != acpi_gbl_FADT.sci_interrupt)
+	if (!acpi_gbl_reduced_hardware && (irq != acpi_gbl_FADT.sci_interrupt))
 		return AE_BAD_PARAMETER;
 
 	free_irq(irq, acpi_irq);
@@ -1067,6 +1074,7 @@ acpi_os_write_memory(acpi_physical_address phys_addr, u64 value, u32 width)
 	return AE_OK;
 }
 
+#ifdef CONFIG_PCI
 acpi_status
 acpi_os_read_pci_configuration(struct acpi_pci_id * pci_id, u32 reg,
 			       u64 *value, u32 width)
@@ -1107,7 +1115,16 @@ acpi_os_read_pci_configuration(struct acpi_pci_id * pci_id, u32 reg,
 
 	return (result ? AE_ERROR : AE_OK);
 }
+#else
+acpi_status
+acpi_os_read_pci_configuration(struct acpi_pci_id *pci_id, u32 reg,
+			       u64 *value, u32 width)
+{
+	return AE_ERROR;
+}
+#endif
 
+#ifdef CONFIG_PCI
 acpi_status
 acpi_os_write_pci_configuration(struct acpi_pci_id * pci_id, u32 reg,
 				u64 value, u32 width)
@@ -1139,6 +1156,14 @@ acpi_os_write_pci_configuration(struct acpi_pci_id * pci_id, u32 reg,
 
 	return (result ? AE_ERROR : AE_OK);
 }
+#else
+acpi_status
+acpi_os_write_pci_configuration(struct acpi_pci_id *pci_id, u32 reg,
+				u64 value, u32 width)
+{
+	return AE_ERROR;
+}
+#endif
 
 static void acpi_os_execute_deferred(struct work_struct *work)
 {
@@ -1819,6 +1844,9 @@ static int __init acpi_no_auto_ssdt_setup(char *s)
 
 __setup("acpi_no_auto_ssdt", acpi_no_auto_ssdt_setup);
 
+#ifdef CONFIG_ACPI_REDUCED_HARDWARE
+acpi_status __init acpi_os_initialize(void) { return AE_OK; }
+#else
 acpi_status __init acpi_os_initialize(void)
 {
 	acpi_os_map_generic_address(&acpi_gbl_FADT.xpm1a_event_block);
@@ -1828,6 +1856,7 @@ acpi_status __init acpi_os_initialize(void)
 
 	return AE_OK;
 }
+#endif
 
 acpi_status __init acpi_os_initialize1(void)
 {
@@ -1845,14 +1874,16 @@ acpi_status __init acpi_os_initialize1(void)
 acpi_status acpi_os_terminate(void)
 {
 	if (acpi_irq_handler) {
-		acpi_os_remove_interrupt_handler(acpi_gbl_FADT.sci_interrupt,
+		acpi_os_remove_interrupt_handler(acpi_irq_number,
 						 acpi_irq_handler);
 	}
 
-	acpi_os_unmap_generic_address(&acpi_gbl_FADT.xgpe1_block);
-	acpi_os_unmap_generic_address(&acpi_gbl_FADT.xgpe0_block);
-	acpi_os_unmap_generic_address(&acpi_gbl_FADT.xpm1b_event_block);
-	acpi_os_unmap_generic_address(&acpi_gbl_FADT.xpm1a_event_block);
+	if (!acpi_gbl_reduced_hardware) {
+		acpi_os_unmap_generic_address(&acpi_gbl_FADT.xgpe1_block);
+		acpi_os_unmap_generic_address(&acpi_gbl_FADT.xgpe0_block);
+		acpi_os_unmap_generic_address(&acpi_gbl_FADT.xpm1b_event_block);
+		acpi_os_unmap_generic_address(&acpi_gbl_FADT.xpm1a_event_block);
+	}
 
 	destroy_workqueue(kacpid_wq);
 	destroy_workqueue(kacpi_notify_wq);

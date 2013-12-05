@@ -305,7 +305,7 @@ fail_free_initrd:
 
 fail_free_image:
 	if (image_allocated)
-		efi_free(sys_table, image_size, *image_addr);
+		efi_free(sys_table, mem_size, *image_addr);
 
 fail_free_dtb:
 	if (fdt_addr)

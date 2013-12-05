@@ -1145,6 +1145,7 @@ static int mmc_sd_resume(struct mmc_host *host)
 	mmc_claim_host(host);
 	mmc_power_up(host);
 	mmc_select_voltage(host, host->ocr);
+
 #ifdef CONFIG_MMC_PARANOID_SD_INIT
 	retries = 5;
 	while (retries) {
