@@ -637,7 +637,7 @@ MODULE_DEVICE_TABLE(of, virtio_mmio_match);
 
 #ifdef CONFIG_ACPI
 static const struct acpi_device_id virtio_mmio_acpi_match[] = {
-	{ "LINA0005", },
+	{ "LNRO0005", },
 	{ }
 };
 MODULE_DEVICE_TABLE(acpi, virtio_mmio_acpi_match);

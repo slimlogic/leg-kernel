@@ -2387,7 +2387,7 @@ MODULE_DEVICE_TABLE(of, smc91x_match);
 
 #ifdef CONFIG_ACPI
 static const struct acpi_device_id smc91x_acpi_match[] = {
-	{ "LINA0003", },
+	{ "LNRO0003", },
 	{ }
 };
 MODULE_DEVICE_TABLE(acpi, smc91x_acpi_match);

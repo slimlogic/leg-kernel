@@ -82,17 +82,6 @@
 /* Blob handling macros */
 #define	ACPI_BLOB_HEADER_SIZE	8
 
-#ifndef CONFIG_ACPI_REDUCED_HARDWARE
-int __acpi_acquire_global_lock(unsigned int *lock);
-int __acpi_release_global_lock(unsigned int *lock);
-
-#define ACPI_ACQUIRE_GLOBAL_LOCK(facs, Acq) \
-	((Acq) = __acpi_acquire_global_lock(&facs->global_lock))
-
-#define ACPI_RELEASE_GLOBAL_LOCK(facs, Acq) \
-	((Acq) = __acpi_release_global_lock(&facs->global_lock))
-#endif
-
 /* Basic configuration for ACPI */
 #ifdef	CONFIG_ACPI
 extern int acpi_disabled;
@@ -116,16 +105,11 @@ extern struct acpi_arm_root acpi_arm_rsdp_info;
 void arm_acpi_reserve_memory(void);
 
 /* Low-level suspend routine. */
-extern int acpi_suspend_lowlevel(void);
+extern int (*acpi_suspend_lowlevel)(void);
 
 extern void prefill_possible_map(void);
 
-/* Physical address to resume after wakeup */
-/* BOZO: was...
-#define acpi_wakeup_address ((unsigned long)(real_mode_header->wakeup_start))
-*/
 #define acpi_wakeup_address (0)
-
 
 static inline void disable_acpi(void)
 {

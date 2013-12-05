@@ -251,13 +251,15 @@ static int __init setup_acpi_rsdp(char *arg)
 early_param("acpi_rsdp", setup_acpi_rsdp);
 #endif
 
-#if defined(CONFIG_ARM) || defined(CONFIG_ARM64)
+#ifdef CONFIG_ACPI_USE_CHOSEN_NODE
 #include <asm/acpi.h>
 #include <acpi/actbl.h>
 
 void acpi_find_arm_root_pointer(acpi_physical_address *pa)
 {
-	/* BOZO: temporarily clunky.
+	/* This function is for development use only, or in extreme
+	 * cases where UEFI is not yet available for the platform.
+	 *
 	 * What we do is, while using u-boot still, is use the values
 	 * that have already been retrieved from the FDT node
 	 * (/chosen/linux,acpi-start and /chosen/linux,acpi-len) which
@@ -281,7 +283,6 @@ void acpi_find_arm_root_pointer(acpi_physical_address *pa)
 	}
 
 	address = phys_to_virt(acpi_arm_rsdp_info.phys_address);
-	address += ACPI_BLOB_HEADER_SIZE;
 	*pa = (acpi_physical_address)address;
 
 	rp = (struct acpi_table_rsdp *)address;
@@ -307,7 +308,7 @@ void acpi_find_arm_root_pointer(acpi_physical_address *pa)
 
 	return;
 }
-#endif
+#endif	/* CONFIG_ACPI_USE_CHOSEN_NODE */
 
 acpi_physical_address __init acpi_os_get_root_pointer(void)
 {
@@ -329,7 +330,7 @@ acpi_physical_address __init acpi_os_get_root_pointer(void)
 	} else {
 		acpi_physical_address pa = 0;
 
-#if defined(CONFIG_ARM) || defined(CONFIG_ARM64)
+#ifdef CONFIG_ACPI_USE_CHOSEN_NODE
 		acpi_find_arm_root_pointer(&pa);
 #else
 		acpi_find_root_pointer(&pa);
@@ -1073,6 +1074,7 @@ acpi_os_write_memory(acpi_physical_address phys_addr, u64 value, u32 width)
 	return AE_OK;
 }
 
+#ifdef CONFIG_PCI
 acpi_status
 acpi_os_read_pci_configuration(struct acpi_pci_id * pci_id, u32 reg,
 			       u64 *value, u32 width)
@@ -1097,23 +1099,23 @@ acpi_os_read_pci_configuration(struct acpi_pci_id * pci_id, u32 reg,
 		return AE_ERROR;
 	}
 
-#ifdef CONFIG_X86
-	/*
-	 * BOZO: probably should not call this function at all
-	 * if there is no PCI...
-	 */
 	result = raw_pci_read(pci_id->segment, pci_id->bus,
 				PCI_DEVFN(pci_id->device, pci_id->function),
 				reg, size, &value32);
-#else
-	result = 0;
-	value32 = 0;
-#endif
 	*value = value32;
 
 	return (result ? AE_ERROR : AE_OK);
 }
+#else
+acpi_status
+acpi_os_read_pci_configuration(struct acpi_pci_id *pci_id, u32 reg,
+			       u64 *value, u32 width)
+{
+	return AE_ERROR;
+}
+#endif
 
+#ifdef CONFIG_PCI
 acpi_status
 acpi_os_write_pci_configuration(struct acpi_pci_id * pci_id, u32 reg,
 				u64 value, u32 width)
@@ -1134,17 +1136,20 @@ acpi_os_write_pci_configuration(struct acpi_pci_id * pci_id, u32 reg,
 		return AE_ERROR;
 	}
 
-#ifdef CONFIG_X86
-	/* BOZO: how do we handle not having PCI? */
 	result = raw_pci_write(pci_id->segment, pci_id->bus,
 				PCI_DEVFN(pci_id->device, pci_id->function),
 				reg, size, value);
-#else
-	result = 0;
-#endif
 
 	return (result ? AE_ERROR : AE_OK);
 }
+#else
+acpi_status
+acpi_os_write_pci_configuration(struct acpi_pci_id *pci_id, u32 reg,
+				u64 value, u32 width)
+{
+	return AE_ERROR;
+}
+#endif
 
 static void acpi_os_execute_deferred(struct work_struct *work)
 {

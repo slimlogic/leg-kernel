@@ -1,5 +1,5 @@
 /*
- *  boot.c - Architecture-Specific Low-Level ACPI Boot Support
+ *  ARM/ARM64 Specific Low-Level ACPI Boot Support
  *
  *  Copyright (C) 2001, 2002 Paul Diefenbaugh <paul.s.diefenbaugh@intel.com>
  *  Copyright (C) 2001 Jun Nakajima <jun.nakajima@intel.com>
@@ -71,18 +71,17 @@ int acpi_noirq;				/* skip ACPI IRQ initialization */
 int acpi_pci_disabled;		/* skip ACPI PCI scan and IRQ initialization */
 EXPORT_SYMBOL(acpi_pci_disabled);
 
-int acpi_lapic;
-int acpi_ioapic;
 int acpi_strict;
 
-u8 acpi_sci_flags __initdata;
-int acpi_sci_override_gsi __initdata;
-int acpi_skip_timer_override __initdata;
-int acpi_use_timer_override __initdata;
-int acpi_fix_pin2_polarity __initdata;
 static u64 acpi_lapic_addr __initdata;
 
 struct acpi_arm_root acpi_arm_rsdp_info;     /* info about RSDP from FDT */
+
+/*
+ * This function pointer is needed to be defined but for now will be NULL
+ * on arm where sleep is handled differently than x86
+ */
+int (*acpi_suspend_lowlevel)(void);
 
 /*
  * Boot-time Configuration
@@ -224,29 +223,6 @@ int acpi_gsi_to_irq(u32 gsi, unsigned int *irq)
 }
 EXPORT_SYMBOL_GPL(acpi_gsi_to_irq);
 
-static int acpi_register_gsi_pic(struct device *dev, u32 gsi,
-				 int trigger, int polarity)
-{
-#ifdef CONFIG_PCI
-	/*
-	 * Make sure all (legacy) PCI IRQs are set as level-triggered.
-	 */
-	if (trigger == ACPI_LEVEL_SENSITIVE)
-		eisa_set_level_irq(gsi);
-#endif
-
-	return gsi;
-}
-
-static int acpi_register_gsi_ioapic(struct device *dev, u32 gsi,
-				    int trigger, int polarity)
-{
-	return gsi;
-}
-
-int (*__acpi_register_gsi)(struct device *dev, u32 gsi,
-			   int trigger, int polarity) = acpi_register_gsi_pic;
-
 /*
  * success: return IRQ number (>=0)
  * failure: return < 0
@@ -255,8 +231,6 @@ int acpi_register_gsi(struct device *dev, u32 gsi, int trigger, int polarity)
 {
 	unsigned int irq;
 	unsigned int plat_gsi = gsi;
-
-	plat_gsi = (*__acpi_register_gsi)(dev, gsi, trigger, polarity);
 
 	irq = gsi_to_irq(plat_gsi);
 
@@ -268,20 +242,6 @@ void acpi_unregister_gsi(u32 gsi)
 {
 }
 EXPORT_SYMBOL_GPL(acpi_unregister_gsi);
-
-void __init acpi_set_irq_model_pic(void)
-{
-	acpi_irq_model = ACPI_IRQ_MODEL_PIC;
-	__acpi_register_gsi = acpi_register_gsi_pic;
-	acpi_ioapic = 0;
-}
-
-void __init acpi_set_irq_model_gic(void)
-{
-	acpi_irq_model = ACPI_IRQ_MODEL_GIC;
-	__acpi_register_gsi = acpi_register_gsi_ioapic;
-	acpi_ioapic = 1;
-}
 
 static int __initdata setup_possible_cpus = -1;
 static int __init _setup_possible_cpus(char *str)
@@ -545,27 +505,14 @@ static void __init acpi_process_madt(void)
 		 */
 		error = acpi_parse_madt_lapic_entries();
 		if (!error) {
-			acpi_lapic = 1;
-
 			/*
 			 * Parse MADT IO-APIC entries
 			 */
-			error = acpi_parse_madt_ioapic_entries();
-			if (!error)
-				acpi_set_irq_model_gic();
+			acpi_parse_madt_ioapic_entries();
 		}
 	}
 
-	/*
-	 * ACPI supports both logical (e.g. Hyper-Threading) and physical
-	 * processors, where MPS only supports physical.
-	 */
-	if (acpi_lapic && acpi_ioapic)
-		pr_info("Using ACPI (MADT) for SMP configuration "
-		       "information\n");
-	else if (acpi_lapic)
-		pr_info("Using ACPI for processor (LAPIC) "
-		       "configuration information\n");
+	pr_info("Using ACPI for processor (GIC) configuration information\n");
 
 	return;
 }
@@ -582,9 +529,6 @@ static void __init acpi_process_madt(void)
  * other side effects.
  *
  * side effects of acpi_boot_init:
- *	acpi_lapic = 1 if LAPIC found
- *	acpi_ioapic = 1 if IOAPIC found
- *	if (acpi_lapic && acpi_ioapic) smp_found_config = 1;
  *	if acpi_blacklisted() acpi_disabled = 1;
  *	acpi_irq_model=...
  *	...

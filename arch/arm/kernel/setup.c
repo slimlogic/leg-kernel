@@ -31,9 +31,7 @@
 #include <linux/compiler.h>
 #include <linux/sort.h>
 #include <linux/efi.h>
-#ifdef CONFIG_ACPI
 #include <linux/acpi.h>
-#endif
 
 #include <asm/unified.h>
 #include <asm/cp15.h>

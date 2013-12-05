@@ -515,7 +515,7 @@ static const struct of_device_id vexpress_sysreg_match[] = {
 
 #ifdef CONFIG_ACPI
 static const struct acpi_device_id vexpress_sysreg_acpi_match[] = {
-	{ "LINA0009", },
+	{ "LNRO0009", },
 	{ }
 };
 #endif
