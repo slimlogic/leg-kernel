@@ -1,0 +1,54 @@
+config GUFI
+	def_bool y
+
+menu "Grand Unified Firmware Interface support"
+	depends on GUFI
+
+choice
+	prompt "Fetching configuration info"
+	default GUFI_ACPI_FIRST
+
+config GUFI_ACPI_ONLY
+	bool "ONLY search ACPI tables"
+	depends on ACPI 
+	help
+	  This option forces GUFI to search for device configuration
+	  information in the ACPI tables and methods only, ignoring
+	  any Device Tree content.
+
+config GUFI_DT_ONLY
+	bool "ONLY search Device Tree"
+	depends on OF 
+	help
+	  This option forces GUFI to search for device configuration
+	  information in the Device Tree only, ignoring any ACPI content.
+
+config GUFI_ACPI_FIRST
+	bool "Always search ACPI tables first"
+	depends on ACPI 
+	help
+	  This option forces GUFI to search for device configuration
+	  information in the ACPI tables and methods first and should
+	  that fail, look in a Device Tree, if it is enabled.
+
+config GUFI_DT_FIRST
+	bool "Always search Device Tree first"
+	depends on OF
+	help
+	  This option forces GUFI to search for device configuration
+	  information in the Device Tree and should that fail, look in
+	  the ACPI tables and methods, if it is enabled.
+
+endchoice
+
+config GUFI_TEST_DRIVER
+	bool "Enable a null driver that can be used to test GUFI"
+	depends on GUFI && (ACPI || OF)
+	help
+	  This option adds a small device driver that can be used to
+	  test out features of GUFI.  It's not really needed unless
+	  you're either developing some part of GUFI or you wish to
+	  verify that the right configuration information is being
+	  retrieved from firmware tables.
+
+endmenu # GUFI
