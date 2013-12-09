@@ -15,6 +15,7 @@
 #include <linux/io.h>
 #include <linux/err.h>
 #include <linux/of.h>
+#include <linux/platform_device.h>
 
 /*
  * DOC: basic fixed-rate clock that cannot gate
@@ -102,5 +103,39 @@ void of_fixed_clk_setup(struct device_node *node)
 		of_clk_add_provider(node, of_clk_src_simple_get, clk);
 }
 EXPORT_SYMBOL_GPL(of_fixed_clk_setup);
-CLK_OF_DECLARE(fixed_clk, "fixed-clock", of_fixed_clk_setup);
 #endif
+
+static int fixed_clk_probe(struct platform_device *pdev)
+{
+	if (pdev->dev.of_node)
+		of_fixed_clk_setup(pdev->dev.of_node);
+	else
+		return -ENODEV;
+
+	return 0;
+}
+
+static const struct of_device_id fixed_clk_match[] = {
+	{ .compatible = "fixed-clock" },
+	{}
+};
+
+static struct platform_driver fixed_clk_driver = {
+	.driver = {
+		.name = "fixed-clk",
+		.owner = THIS_MODULE,
+		.of_match_table = fixed_clk_match,
+	},
+	.probe	= fixed_clk_probe,
+};
+
+static int __init fixed_clk_init(void)
+{
+	return platform_driver_register(&fixed_clk_driver);
+}
+
+/**
+ * fixed clock will used for AMBA bus, UART and etc, so it should be
+ * initialized early enough.
+ */
+postcore_initcall(fixed_clk_init);
