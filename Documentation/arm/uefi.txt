@@ -1,0 +1,47 @@
+UEFI, the Unified Extensible Firmware Interface is a speifcication
+governing the behaviours of compatible firmware interfaces. It is
+maintained by the UEFI Forum - http://www.uefi.org/.
+
+Since UEFI is an evolution of its predecessor 'EFI', the terms EFI and
+UEFI are used somewhat interchangeably in this document and associated
+source code.
+
+The implementation depends on receiving the UEFI runtime memory map and a
+pointer to the System Table in a Flattened Device Tree - so is only available
+with CONFIG_OF.
+
+It parses the FDT /chosen node for the following parameters:
+- 'linux,efi-system-table':
+  Physical address of the system table. (required)
+  64-bit value since an ARMv7 plattform may support LPAE, and to facilitate
+  code sharing with arm64. Top 32 bits will be ignored, since UEFI specification
+  mandates a 1:1 mapping of all RAM.
+- 'linux,efi-mmap':
+  The EFI memory map as an embedded property. (required)
+  An array of type EFI_MEMORY_DESCRIPTOR as described by the UEFI
+  specification, current version described in Linux by efi_memory_desc_t.
+  The memory map is represented in little-endian, not DT, byte order.
+  This map needs to contain at least the regions to be preserved for runtime
+  services, but would normally just be the map retreieved by calling UEFI
+  GetMemoryMap() immediately before ExitBootServices().
+- 'linux,efi-mmap-desc-size':
+  Size of each descriptor in the memory map. (override default)
+- 'linux,efi-mmap-desc-ver':
+  Memory descriptor format version. (override default)
+
+It also depends on early_memremap() to parse the UEFI configuration tables.
+
+For actually enabling [U]EFI support, enable:
+- CONFIG_EFI=y
+- CONFIG_EFI_VARS=y or m
+
+After the kernel has mapped the required regions into its address space,
+a SetVirtualAddressMap() call is made into UEFI in order to update
+relocations. This call must be performed with all the code in a 1:1
+mapping. This implementation achieves this by temporarily disabling the
+MMU for the duration of this call. This can only be done safely:
+- before secondary CPUs are brought online.
+- after early_initcalls have completed, since it uses setup_mm_for_reboot().
+
+For verbose debug messages, specify 'uefi_debug' on the kernel command
+line.
