@@ -179,4 +179,4 @@ static int __init fixed_clk_init(void)
  * fixed clock will used for AMBA bus, UART and etc, so it should be
  * initialized early enough.
  */
-postcore_initcall(fixed_clk_init);
+subsys_initcall(fixed_clk_init);
