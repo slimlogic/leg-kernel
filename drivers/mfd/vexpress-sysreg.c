@@ -15,14 +15,13 @@
 #include <linux/gpio.h>
 #include <linux/io.h>
 #include <linux/leds.h>
-#include <linux/of_address.h>
+#include <linux/gufi.h>
 #include <linux/platform_device.h>
 #include <linux/regulator/driver.h>
 #include <linux/slab.h>
 #include <linux/stat.h>
 #include <linux/timer.h>
 #include <linux/vexpress.h>
-#include <linux/acpi.h>
 
 #define SYS_ID			0x000
 #define SYS_SW			0x004
@@ -118,9 +117,11 @@ void __iomem *vexpress_get_24mhz_clock_base(void)
 static void vexpress_sysreg_find_prop(struct device_node *node,
 		const char *name, u32 *val)
 {
+	/* BOZO: should be gufi_node_get(node); */
 	of_node_get(node);
 	while (node) {
 		if (of_property_read_u32(node, name, val) == 0) {
+			/* BOZO: should be gufi_node_put(node); */
 			of_node_put(node);
 			return;
 		}
@@ -339,15 +340,16 @@ void __init vexpress_sysreg_early_init(void __iomem *base)
 
 void __init vexpress_sysreg_of_early_init(void)
 {
-	struct device_node *node;
+	struct gufi_device_node *node;
 
 	if (vexpress_sysreg_base)
 		return;
 
-	node = of_find_compatible_node(NULL, NULL, "arm,vexpress-sysreg");
+	node = gufi_find_compatible_node(NULL, NULL, "arm,vexpress-sysreg");
 	if (node) {
-		vexpress_sysreg_base = of_iomap(node, 0);
-		vexpress_sysreg_setup(node);
+		vexpress_sysreg_base = gufi_iomap(node, 0);
+		/* BOZO: was vexpress_sysreg_setup(node); */
+		vexpress_sysreg_setup(node->dn);
 	}
 }
 
