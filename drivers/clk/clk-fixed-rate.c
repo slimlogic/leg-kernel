@@ -16,6 +16,8 @@
 #include <linux/err.h>
 #include <linux/of.h>
 #include <linux/platform_device.h>
+#include <linux/acpi.h>
+#include <linux/clkdev.h>
 
 /*
  * DOC: basic fixed-rate clock that cannot gate
@@ -105,10 +107,43 @@ void of_fixed_clk_setup(struct device_node *node)
 EXPORT_SYMBOL_GPL(of_fixed_clk_setup);
 #endif
 
+#ifdef CONFIG_ACPI
+static int fixed_clk_probe_acpi(struct platform_device *pdev)
+{
+	struct clk *clk = ERR_PTR(-ENODEV);
+	unsigned long long rate = 0;
+	acpi_status status;
+
+	/* there is a corresponding FREQ method under fixed clock object */
+	status = acpi_evaluate_integer(ACPI_HANDLE(&pdev->dev), "FREQ",
+					NULL, &rate);
+	if (ACPI_FAILURE(status))
+		return -ENODEV;
+
+	clk = clk_register_fixed_rate(NULL, dev_name(&pdev->dev), NULL,
+					CLK_IS_ROOT, rate);
+	if (IS_ERR(clk))
+		return -ENODEV;
+
+	/*
+	 * if we don't register the clk here, we can't get the clk
+	 * for AMBA bus when CONFIG_OF=n
+	 */
+	return clk_register_clkdev(clk, NULL, dev_name(&pdev->dev));
+}
+#else
+static inline int fixed_clk_probe_acpi(struct platform_device *pdev)
+{
+	return -ENODEV;
+}
+#endif /* CONFIG_ACPI */
+
 static int fixed_clk_probe(struct platform_device *pdev)
 {
 	if (pdev->dev.of_node)
 		of_fixed_clk_setup(pdev->dev.of_node);
+	else if (ACPI_HANDLE(&pdev->dev))
+		return fixed_clk_probe_acpi(pdev);
 	else
 		return -ENODEV;
 
@@ -120,11 +155,17 @@ static const struct of_device_id fixed_clk_match[] = {
 	{}
 };
 
+static const struct acpi_device_id fixed_clk_acpi_match[] = {
+	{ "LNRO0008", 0 },
+	{ },
+};
+
 static struct platform_driver fixed_clk_driver = {
 	.driver = {
 		.name = "fixed-clk",
 		.owner = THIS_MODULE,
 		.of_match_table = fixed_clk_match,
+		.acpi_match_table = ACPI_PTR(fixed_clk_acpi_match),
 	},
 	.probe	= fixed_clk_probe,
 };
