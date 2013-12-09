@@ -15,6 +15,7 @@
 #define _LINUX_VEXPRESS_H
 
 #include <linux/device.h>
+#include <linux/gufi.h>
 #include <linux/reboot.h>
 
 #define VEXPRESS_SITE_MB		0
@@ -69,7 +70,7 @@
  */
 struct vexpress_config_bridge_info {
 	const char *name;
-	void *(*func_get)(struct device *dev, struct device_node *node);
+	void *(*func_get)(struct device *dev, struct gufi_device_node *node);
 	void (*func_put)(void *func);
 	int (*func_exec)(void *func, int offset, bool write, u32 *data);
 };
@@ -77,7 +78,7 @@ struct vexpress_config_bridge_info {
 struct vexpress_config_bridge;
 
 struct vexpress_config_bridge *vexpress_config_bridge_register(
-		struct device_node *node,
+		struct gufi_device_node *node,
 		struct vexpress_config_bridge_info *info);
 void vexpress_config_bridge_unregister(struct vexpress_config_bridge *bridge);
 
@@ -89,7 +90,7 @@ void vexpress_config_complete(struct vexpress_config_bridge *bridge,
 struct vexpress_config_func;
 
 struct vexpress_config_func *__vexpress_config_func_get(struct device *dev,
-		struct device_node *node);
+		struct gufi_device_node *node);
 #define vexpress_config_func_get_by_dev(dev) \
 		__vexpress_config_func_get(dev, NULL)
 #define vexpress_config_func_get_by_node(node) \
@@ -111,7 +112,7 @@ void vexpress_flags_set(u32 data);
 
 #define vexpress_get_site_by_node(node) __vexpress_get_site(NULL, node)
 #define vexpress_get_site_by_dev(dev) __vexpress_get_site(dev, NULL)
-unsigned __vexpress_get_site(struct device *dev, struct device_node *node);
+unsigned __vexpress_get_site(struct device *dev, struct gufi_device_node *node);
 
 void vexpress_sysreg_early_init(void __iomem *base);
 void vexpress_sysreg_of_early_init(void);
@@ -119,7 +120,7 @@ void vexpress_sysreg_of_early_init(void);
 /* Clocks */
 
 struct clk *vexpress_osc_setup(struct device *dev);
-void vexpress_osc_of_setup(struct device_node *node);
+void vexpress_osc_of_setup(struct gufi_device_node *node);
 
 void vexpress_clk_init(void __iomem *sp810_base);
 void vexpress_clk_of_init(void);
