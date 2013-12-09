@@ -108,6 +108,13 @@ static inline void prefetch(const void *ptr)
 #define ARCH_HAS_SPINLOCK_PREFETCH
 #define spin_lock_prefetch(x) do { } while (0)
 
+#ifdef CONFIG_ACPI
+enum idle_boot_override { IDLE_NO_OVERRIDE = 0, IDLE_HALT, IDLE_NOMWAIT,
+			  IDLE_POLL, IDLE_FORCE_MWAIT };
+
+extern unsigned long	boot_option_idle_override;
+#endif
+
 #endif
 
 #define HAVE_ARCH_PICK_MMAP_LAYOUT

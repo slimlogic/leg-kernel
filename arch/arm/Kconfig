@@ -2327,9 +2327,11 @@ config ARTHUR
 
 endmenu
 
-menu "Power management options"
+menu "Power management and ACPI options"
 
 source "kernel/power/Kconfig"
+
+source "drivers/acpi/Kconfig"
 
 config ARCH_SUSPEND_POSSIBLE
 	depends on !ARCH_S5PC100

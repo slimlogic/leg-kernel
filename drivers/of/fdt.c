@@ -784,6 +784,41 @@ void * __init __weak early_init_dt_alloc_memory_arch(u64 size, u64 align)
 }
 #endif
 
+#if (defined(CONFIG_ARM64) || defined (CONFIG_ARM)) && defined(CONFIG_ACPI)
+#include <linux/memblock.h>
+#include <linux/acpi.h>
+#include <asm/acpi.h>
+#include <acpi/actbl.h>
+
+int __init early_init_dt_scan_acpi(unsigned long node, const char *uname,
+		int depth, void *data)
+{
+	unsigned long l;
+	unsigned int *p;
+	struct acpi_arm_root *pinfo;
+
+	pr_debug("search \"chosen\" for acpi info, depth: %d, uname: %s\n",
+			depth, uname);
+
+	if (depth != 1 || !data ||
+			(strcmp(uname, "chosen") != 0 && strcmp(uname, "chosen@0") != 0))
+		return 0;
+
+	/* Retrieve acpi,address line */
+	pinfo = (struct acpi_arm_root *)data;
+	p = of_get_flat_dt_prop(node, "linux,acpi-start", &l);
+	if (p)
+		pinfo->phys_address = of_read_ulong(p, l/4);
+
+	/* Retrieve acpi,size line */
+	p = of_get_flat_dt_prop(node, "linux,acpi-len", &l);
+	if (p)
+		pinfo->size = of_read_ulong(p, l/4);
+
+	return 1;
+}
+#endif
+
 /**
  * unflatten_device_tree - create tree of device_nodes from flat blob
  *

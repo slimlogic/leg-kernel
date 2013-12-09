@@ -567,8 +567,6 @@ static void acpi_pci_root_remove(struct acpi_device *device)
 
 void __init acpi_pci_root_init(void)
 {
-	acpi_hest_init();
-
 	if (!acpi_pci_disabled) {
 		pci_acpi_crs_quirks();
 		acpi_scan_add_handler(&pci_root_handler);

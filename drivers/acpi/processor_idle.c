@@ -42,9 +42,7 @@
  * asm/acpi.h is not an option, as it would require more include magic. Also
  * creating an empty asm-ia64/apic.h would just trade pest vs. cholera.
  */
-#ifdef CONFIG_X86
 #include <asm/apic.h>
-#endif
 
 #include <acpi/acpi_bus.h>
 #include <acpi/processor.h>
@@ -209,16 +207,16 @@ static void lapic_timer_state_broadcast(struct acpi_processor *pr,
 
 #endif
 
-#ifdef CONFIG_PM_SLEEP
+#if IS_ENABLED(CONFIG_PM_SLEEP) && !IS_ENABLED(CONFIG_ACPI_REDUCED_HARDWARE)
 static u32 saved_bm_rld;
 
-static int acpi_processor_suspend(void)
+int acpi_processor_suspend(void)
 {
 	acpi_read_bit_register(ACPI_BITREG_BUS_MASTER_RLD, &saved_bm_rld);
 	return 0;
 }
 
-static void acpi_processor_resume(void)
+void acpi_processor_resume(void)
 {
 	u32 resumed_bm_rld;
 
@@ -243,7 +241,13 @@ void acpi_processor_syscore_exit(void)
 {
 	unregister_syscore_ops(&acpi_processor_syscore_ops);
 }
-#endif /* CONFIG_PM_SLEEP */
+
+#else
+
+void acpi_processor_syscore_init(void){}
+void acpi_processor_syscore_exit(void){}
+
+#endif /* CONFIG_PM_SLEEP && !CONFIG_ACPI_REDUCED_HARDWARE */
 
 #if defined(CONFIG_X86)
 static void tsc_check_state(int state)
@@ -287,7 +291,8 @@ static int acpi_processor_get_power_info_fadt(struct acpi_processor *pr)
 	 * Check for P_LVL2_UP flag before entering C2 and above on
 	 * an SMP system.
 	 */
-	if ((num_online_cpus() > 1) &&
+	if (!acpi_gbl_reduced_hardware &&
+	    (num_online_cpus() > 1) &&
 	    !(acpi_gbl_FADT.flags & ACPI_FADT_C2_MP_SUPPORTED))
 		return -ENODEV;
 #endif
@@ -608,7 +613,7 @@ static int acpi_processor_power_verify(struct acpi_processor *pr)
 		case ACPI_STATE_C2:
 			if (!cx->address)
 				break;
-			cx->valid = 1; 
+			cx->valid = 1;
 			break;
 
 		case ACPI_STATE_C3:
@@ -641,7 +646,7 @@ static int acpi_processor_get_power_info(struct acpi_processor *pr)
 	memset(pr->power.states, 0, sizeof(pr->power.states));
 
 	result = acpi_processor_get_power_info_cst(pr);
-	if (result == -ENODEV)
+	if (!acpi_gbl_reduced_hardware && (result == -ENODEV))
 		result = acpi_processor_get_power_info_fadt(pr);
 
 	if (result)
@@ -751,6 +756,7 @@ static int acpi_idle_enter_c1(struct cpuidle_device *dev,
  * @dev: the target CPU
  * @index: the index of suggested state
  */
+#ifdef CONFIG_X86
 static int acpi_idle_play_dead(struct cpuidle_device *dev, int index)
 {
 	struct acpi_processor_cx *cx = per_cpu(acpi_cstate[index], dev->cpu);
@@ -758,7 +764,6 @@ static int acpi_idle_play_dead(struct cpuidle_device *dev, int index)
 	ACPI_FLUSH_CPU_CACHE();
 
 	while (1) {
-
 		if (cx->entry_method == ACPI_CSTATE_HALT)
 			safe_halt();
 		else if (cx->entry_method == ACPI_CSTATE_SYSTEMIO) {
@@ -772,6 +777,12 @@ static int acpi_idle_play_dead(struct cpuidle_device *dev, int index)
 	/* Never reached */
 	return 0;
 }
+#else
+static int acpi_idle_play_dead(struct cpuidle_device *dev, int index)
+{
+	return 0;
+}
+#endif
 
 /**
  * acpi_idle_enter_simple - enters an ACPI state without BM handling
@@ -962,7 +973,8 @@ static int acpi_processor_setup_cpuidle_cx(struct acpi_processor *pr,
 			continue;
 
 #ifdef CONFIG_HOTPLUG_CPU
-		if ((cx->type != ACPI_STATE_C1) && (num_online_cpus() > 1) &&
+		if (!acpi_gbl_reduced_hardware &&
+		    (cx->type != ACPI_STATE_C1) && (num_online_cpus() > 1) &&
 		    !pr->flags.has_cst &&
 		    !(acpi_gbl_FADT.flags & ACPI_FADT_C2_MP_SUPPORTED))
 			continue;
@@ -1017,7 +1029,8 @@ static int acpi_processor_setup_cpuidle_states(struct acpi_processor *pr)
 			continue;
 
 #ifdef CONFIG_HOTPLUG_CPU
-		if ((cx->type != ACPI_STATE_C1) && (num_online_cpus() > 1) &&
+		if (!acpi_gbl_reduced_hardware &&
+		    (cx->type != ACPI_STATE_C1) && (num_online_cpus() > 1) &&
 		    !pr->flags.has_cst &&
 		    !(acpi_gbl_FADT.flags & ACPI_FADT_C2_MP_SUPPORTED))
 			continue;

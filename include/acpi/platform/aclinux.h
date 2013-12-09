@@ -174,6 +174,12 @@ static inline void *acpi_os_acquire_object(acpi_cache_t * cache)
 	lock ? AE_OK : AE_NO_MEMORY;				\
 })
 
+#ifdef CONFIG_ACPI_REDUCED_HARDWARE
+#define FLAG_ACPI_HW_REDUCED TRUE
+#else
+#define FLAG_ACPI_HW_REDUCED FALSE
+#endif /* CONFIG_ACPI_REDUCED_HARDWARE */
+
 #endif /* __KERNEL__ */
 
 #endif /* __ACLINUX_H__ */

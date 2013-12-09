@@ -42,6 +42,7 @@
 #include <linux/of_fdt.h>
 #include <linux/of_platform.h>
 #include <linux/efi.h>
+#include <linux/acpi.h>
 
 #include <asm/fixmap.h>
 #include <asm/cputype.h>
@@ -56,6 +57,8 @@
 #include <asm/memblock.h>
 #include <asm/psci.h>
 #include <asm/efi.h>
+#include <asm/cpu.h>
+#include <asm/acpi.h>
 
 unsigned int processor_id;
 EXPORT_SYMBOL(processor_id);
@@ -260,7 +263,23 @@ void __init setup_arch(char **cmdline_p)
 
 	arm64_memblock_init();
 
+#ifdef CONFIG_ACPI
+	arm_acpi_reserve_memory();
+#endif
+
 	efi_init();
+
+#ifdef CONFIG_ACPI
+	/*
+	 * Parse the ACPI tables for possible boot-time configuration
+	 */
+	acpi_boot_table_init();
+	early_acpi_boot_init();
+	boot_cpu_apic_id = read_cpuid_mpidr() & MPIDR_HWID_BITMASK;
+	acpi_boot_init();
+	prefill_possible_map();
+#endif
+
 	paging_init();
 	request_standard_resources();
 
@@ -291,18 +310,18 @@ static int __init arm64_device_init(void)
 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
 	return 0;
 }
-arch_initcall(arm64_device_init);
+subsys_initcall_sync(arm64_device_init);
 
-static DEFINE_PER_CPU(struct cpu, cpu_data);
+DEFINE_PER_CPU(struct cpuinfo_arm, cpu_data);
 
 static int __init topology_init(void)
 {
 	int i;
 
 	for_each_possible_cpu(i) {
-		struct cpu *cpu = &per_cpu(cpu_data, i);
-		cpu->hotpluggable = 1;
-		register_cpu(cpu, i);
+		struct cpuinfo_arm *cpuinfo = &per_cpu(cpu_data, i);
+		cpuinfo->cpu.hotpluggable = 1;
+		register_cpu(&cpuinfo->cpu, i);
 	}
 
 	return 0;

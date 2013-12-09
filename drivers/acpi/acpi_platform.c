@@ -30,6 +30,16 @@ static const struct acpi_device_id acpi_platform_device_ids[] = {
 
 	{ "PNP0D40" },
 
+	/* arm64 platform devices */
+	{ "LNRO0003" }, /* smc91x for ethernet */
+	{ "LNRO0005" }, /* virtio mmio */
+	{ "LNRO0007" }, /* armv8 pmu */
+	{ "LNRO0008" }, /* Fixed clock */
+	{ "LNRO0009" }, /* vexpress-sysreg */
+	{ "LNRO000A" }, /* uart-pl011 */
+
+	{ "AMBA0000" },
+
 	{ }
 };
 
