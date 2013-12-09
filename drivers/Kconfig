@@ -10,6 +10,8 @@ source "drivers/mtd/Kconfig"
 
 source "drivers/of/Kconfig"
 
+source "drivers/gufi/Kconfig"
+
 source "drivers/parport/Kconfig"
 
 source "drivers/pnp/Kconfig"
