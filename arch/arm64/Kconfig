@@ -325,12 +325,6 @@ source "drivers/Kconfig"
 
 source "drivers/firmware/Kconfig"
 
-menu "Power management and ACPI options"
-
-source "drivers/acpi/Kconfig"
-
-endmenu
-
 source "fs/Kconfig"
 
 source "arch/arm64/kvm/Kconfig"
