@@ -237,7 +237,8 @@ static struct ion_heap_ops system_heap_ops = {
 	.map_user = ion_heap_map_user,
 };
 
-static int ion_system_heap_shrink(struct shrinker *shrinker,
+
+static unsigned long ion_system_heap_count(struct shrinker *shrinker,
 				  struct shrink_control *sc) {
 
 	struct ion_heap *heap = container_of(shrinker, struct ion_heap,
@@ -246,6 +247,28 @@ static int ion_system_heap_shrink(struct shrinker *shrinker,
 							struct ion_system_heap,
 							heap);
 	int nr_total = 0;
+	int i;
+
+	/* total number of items is whatever the page pools are holding
+	   plus whatever's in the freelist */
+	for (i = 0; i < num_orders; i++) {
+		struct ion_page_pool *pool = sys_heap->pools[i];
+		nr_total += ion_page_pool_shrink(pool, sc->gfp_mask, 0);
+	}
+	nr_total += ion_heap_freelist_size(heap) / PAGE_SIZE;
+	return nr_total;
+
+}
+
+
+static unsigned long ion_system_heap_shrink(struct shrinker *shrinker,
+				  struct shrink_control *sc) {
+
+	struct ion_heap *heap = container_of(shrinker, struct ion_heap,
+					     shrinker);
+	struct ion_system_heap *sys_heap = container_of(heap,
+							struct ion_system_heap,
+							heap);
 	int nr_freed = 0;
 	int i;
 
@@ -268,16 +291,8 @@ static int ion_system_heap_shrink(struct shrinker *shrinker,
 		if (nr_freed >= sc->nr_to_scan)
 			break;
 	}
-
 end:
-	/* total number of items is whatever the page pools are holding
-	   plus whatever's in the freelist */
-	for (i = 0; i < num_orders; i++) {
-		struct ion_page_pool *pool = sys_heap->pools[i];
-		nr_total += ion_page_pool_shrink(pool, sc->gfp_mask, 0);
-	}
-	nr_total += ion_heap_freelist_size(heap) / PAGE_SIZE;
-	return nr_total;
+	return nr_freed;
 
 }
 
@@ -328,7 +343,8 @@ struct ion_heap *ion_system_heap_create(struct ion_platform_heap *unused)
 		heap->pools[i] = pool;
 	}
 
-	heap->heap.shrinker.shrink = ion_system_heap_shrink;
+	heap->heap.shrinker.count_objects = ion_system_heap_count;
+	heap->heap.shrinker.scan_objects = ion_system_heap_shrink;
 	heap->heap.shrinker.seeks = DEFAULT_SEEKS;
 	heap->heap.shrinker.batch = 0;
 	register_shrinker(&heap->heap.shrinker);
