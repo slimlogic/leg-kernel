@@ -22,10 +22,10 @@
  * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
  */
 
-#ifdef	CONFIG_GUFI
-
 #include <linux/gufi.h>
 #include <linux/of_address.h>
+
+#ifdef	CONFIG_GUFI
 
 enum search_preference {
 	SEARCH_ACPI_ONLY = 0,
@@ -36,11 +36,11 @@ enum search_preference {
 
 #if IS_ENABLED(CONFIG_GUFI_ACPI_ONLY)
 #define DEFAULT_PREFERENCE	SEARCH_ACPI_ONLY
-#elif IS_ENABLED(CONFIG_GUFI_DT_ONLY
+#elif IS_ENABLED(CONFIG_GUFI_DT_ONLY)
 #define DEFAULT_PREFERENCE	SEARCH_DT_ONLY
-#elif IS_ENABLED(CONFIG_GUFI_ACPI_FIRST
+#elif IS_ENABLED(CONFIG_GUFI_ACPI_FIRST)
 #define DEFAULT_PREFERENCE	SEARCH_ACPI_FIRST
-#elif IS_ENABLED(CONFIG_GUFI_DT_FIRST
+#elif IS_ENABLED(CONFIG_GUFI_DT_FIRST)
 #define DEFAULT_PREFERENCE	SEARCH_DT_FIRST
 #else
 #define DEFAULT_PREFERENCE	SEARCH_ACPI_FIRST
@@ -148,6 +148,7 @@ static void gufi_node_release(struct kref *kref)
 
 	kfree(gdn);
 }
+EXPORT_SYMBOL(gufi_node_release);
 
 /**
  * gufi_node_put - Decrement the reference count for a node
@@ -166,6 +167,26 @@ void gufi_node_put(struct gufi_device_node *gdn)
 	}
 }
 EXPORT_SYMBOL(gufi_node_put);
+
+/* Tree walking routines */
+
+/**
+ * gufi_get_next_parent - Iterate to a node's parent
+ * @node:	Node to get parent of
+ *
+ *  This is like of_get_parent() except that it drops the
+ *  refcount on the passed node, making it suitable for iterating
+ *  through a node's parents.
+ *
+ * Returns a node pointer with refcount incremented, use
+ * gufi_node_put() on it when done.
+ */
+struct gufi_device_node *gufi_get_next_parent(struct gufi_device_node *node)
+{
+	/* TODO: not implemented yet */
+	return NULL;
+}
+EXPORT_SYMBOL(gufi_get_next_parent);
 
 
 /* Search for nodes in interesting ways */
@@ -260,14 +281,97 @@ struct gufi_device_node *gufi_find_compatible_node(
 	struct acpi_device_id *id = NULL;
 	struct gufi_device_node *node;
 
+	dn = (gdn == NULL) ? NULL : gdn->dn;
 	run_in_order(search,
-		     dn = of_find_compatible_node(gdn->dn, type, compatible),
+		     dn = of_find_compatible_node(dn, type, compatible),
 		     id = __gufi_find_acpi_compatible(gdn, type, compatible)
 		    );
 	node = __gufi_look_for_node(dn, id);
 	gufi_node_put(node);
 	return node;
 }
+EXPORT_SYMBOL(gufi_find_compatible_node);
+
+/**
+ * gufi_find_node_by_phandle - Find a node given a phandle
+ * @handle:	phandle of the node to find
+ *
+ * Returns a node pointer with refcount incremented, use
+ * gufi_node_put() on it when done.
+ */
+struct gufi_device_node *gufi_find_node_by_phandle(phandle handle)
+{
+	/* TODO: not implemented yet */
+	return NULL;
+}
+EXPORT_SYMBOL(gufi_find_node_by_phandle);
+
+
+/* Retrieve values for specific properties */
+
+/**
+ * gufi_property_read_u32_array - Find and read an array of 32 bit integers
+ * from a property.
+ *
+ * @np:		device node from which the property value is to be read.
+ * @propname:	name of the property to be searched.
+ * @out_values:	pointer to return value, modified only if return value is 0.
+ * @sz:		number of array elements to read
+ *
+ * Search for a property in a device node and read 32-bit value(s) from
+ * it. Returns 0 on success, -EINVAL if the property does not exist,
+ * -ENODATA if property does not have a value, and -EOVERFLOW if the
+ * property data isn't large enough.
+ *
+ * The out_values is modified only if a valid u32 value can be decoded.
+ */
+int gufi_property_read_u32_array(const struct gufi_device_node *np,
+			         const char *propname, u32 *out_values,
+			         size_t sz)
+{
+	/* TODO: not implemented yet */
+	return -ENOSYS;
+}
+EXPORT_SYMBOL(gufi_property_read_u32_array);
+
+/**
+ * of_property_read_string - Find and read a string from a property
+ * @np:		device node from which the property value is to be read.
+ * @propname:	name of the property to be searched.
+ * @out_string:	pointer to null terminated return string, modified only if
+ *		return value is 0.
+ *
+ * Search for a property in a device tree node and retrieve a null
+ * terminated string value (pointer to data, not a copy). Returns 0 on
+ * success, -EINVAL if the property does not exist, -ENODATA if property
+ * does not have a value, and -EILSEQ if the string is not null-terminated
+ * within the length of the property data.
+ *
+ * The out_string pointer is modified only if a valid string can be decoded.
+ */
+int gufi_property_read_string(struct gufi_device_node *np,
+			      const char *propname,
+			      const char **out_string)
+{
+	/* TODO: not implemented yet */
+	return -ENOSYS;
+}
+EXPORT_SYMBOL(gufi_property_read_string);
+
+
+/*
+ * Find a property with a given name for a given node
+ * and return the value.
+ */
+const void *gufi_get_property(const struct gufi_device_node *np,
+			      const char *name,
+			      int *lenp)
+{
+	/* TODO: not implemented yet */
+	return NULL;
+}
+EXPORT_SYMBOL(of_get_property);
+
 
 
 /* Addressing routines */
@@ -304,6 +408,68 @@ void __iomem *gufi_iomap(struct gufi_device_node *gdn, int index)
 		     ptr = __gufi_acpi_iomap(gdn)
 		    );
 	return ptr;
+}
+
+#else	/* CONFIG_GUFI */
+
+/* Reference counting routines */
+static inline
+struct gufi_device_node *gufi_node_get(struct gufi_device_node *gdn)
+{
+	return NULL;
+}
+static inline void gufi_node_put(struct gufi_device_node *gdn) { return; }
+
+/* Search for nodes in interesting ways */
+static inline struct gufi_device_node *gufi_find_compatible_node(
+						struct gufi_device_node *gdn,
+						const char *type,
+						const char *compatible)
+{
+	return NULL;
+}
+
+static inline struct gufi_device_node *gufi_find_node_by_phandle(phandle handle)
+{
+	return NULL;
+}
+
+/* Tree walking routines */
+static inline
+struct gufi_device_node *gufi_get_next_parent(struct gufi_device_node *node)
+{
+	return NULL;
+}
+
+/* Retrieve values for specific properties */
+static inline int gufi_property_read_u32_array(
+					const struct gufi_device_node *np,
+					const char *propname,
+					u32 *out_values,
+					size_t sz)
+{
+	return -ENOSYS;
+}
+
+static inline int gufi_property_read_string(struct gufi_device_node *np,
+					    const char *propname,
+					    const char **out_string)
+{
+	return -ENOSYS;
+}
+
+static inline const void *gufi_get_property(const struct device_node *node,
+					    const char *name,
+					    int *lenp)
+{
+	return NULL;
+}
+
+
+/* Addressing routines */
+static inline void __iomem *gufi_iomap(struct gufi_device_node *gdn, int index)
+{
+	return NULL;
 }
 
 #endif	/* CONFIG_GUFI */
