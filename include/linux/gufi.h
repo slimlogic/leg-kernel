@@ -25,8 +25,6 @@
 #ifndef _LINUX_GUFI_H
 #define _LINUX_GUFI_H
 
-#ifdef CONFIG_GUFI
-
 #include <linux/acpi.h>
 #include <linux/errno.h>
 #include <linux/kref.h>
@@ -50,34 +48,25 @@ extern struct gufi_device_node *gufi_find_compatible_node(
 						struct gufi_device_node *gdn,
 						const char *type,
 						const char *compatible);
+extern struct gufi_device_node *gufi_find_node_by_phandle(phandle handle);
+
+/* Tree walking routines */
+extern struct gufi_device_node *gufi_get_next_parent(
+						struct gufi_device_node *node);
+
+/* Retrieve values for specific properties */
+extern int gufi_property_read_u32_array(const struct gufi_device_node *np,
+				        const char *propname,
+				        u32 *out_values,
+				        size_t sz);
+extern int gufi_property_read_string(struct gufi_device_node *np,
+			             const char *propname,
+			             const char **out_string);
+extern const void *gufi_get_property(const struct gufi_device_node *node,
+				     const char *name,
+				     int *lenp);
 
 /* Addressing routines */
 extern void __iomem *gufi_iomap(struct gufi_device_node *gdn, int index);
-
-#else	/* CONFIG_GUFI */
-
-/* Reference counting routines */
-struct gufi_device_node *gufi_node_get(struct gufi_device_node *gdn)
-{
-	return NULL;
-}
-void gufi_node_put(struct gufi_device_node *gdn) { return; }
-
-/* Search for nodes in interesting ways */
-struct gufi_device_node *gufi_find_compatible_node(
-						struct gufi_device_node *gdn,
-						const char *type,
-						const char *compatible)
-{
-	return NULL;
-}
-
-/* Addressing routines */
-void __iomem *gufi_iomap(struct gufi_device_node *gdn, int index)
-{
-	return NULL;
-}
-
-#endif	/* CONFIG_GUFI */
 
 #endif	/*_LINUX_GUFI_H */
