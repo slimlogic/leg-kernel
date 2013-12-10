@@ -114,18 +114,16 @@ void __iomem *vexpress_get_24mhz_clock_base(void)
 }
 
 
-static void vexpress_sysreg_find_prop(struct device_node *node,
+static void vexpress_sysreg_find_prop(struct gufi_device_node *node,
 		const char *name, u32 *val)
 {
-	/* BOZO: should be gufi_node_get(node); */
-	of_node_get(node);
+	gufi_node_get(node);
 	while (node) {
-		if (of_property_read_u32(node, name, val) == 0) {
-			/* BOZO: should be gufi_node_put(node); */
-			of_node_put(node);
+		if (gufi_property_read_u32(node, name, val) == 0) {
+			gufi_node_put(node);
 			return;
 		}
-		node = of_get_next_parent(node);
+		node = gufi_get_next_parent(node);
 	}
 }
 
@@ -348,7 +346,6 @@ void __init vexpress_sysreg_of_early_init(void)
 	node = gufi_find_compatible_node(NULL, NULL, "arm,vexpress-sysreg");
 	if (node) {
 		vexpress_sysreg_base = gufi_iomap(node, 0);
-		/* BOZO: was vexpress_sysreg_setup(node); */
 		vexpress_sysreg_setup(node->dn);
 	}
 }

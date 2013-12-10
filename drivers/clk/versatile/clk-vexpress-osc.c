@@ -16,7 +16,7 @@
 #include <linux/clkdev.h>
 #include <linux/clk-provider.h>
 #include <linux/err.h>
-#include <linux/of.h>
+#include <linux/gufi.h>
 #include <linux/platform_device.h>
 #include <linux/slab.h>
 #include <linux/vexpress.h>
@@ -93,7 +93,7 @@ struct clk * __init vexpress_osc_setup(struct device *dev)
 	return clk_register(NULL, &osc->hw);
 }
 
-void __init vexpress_osc_of_setup(struct device_node *node)
+void __init vexpress_osc_of_setup(struct gufi_device_node *node)
 {
 	struct clk_init_data init;
 	struct vexpress_osc *osc;
@@ -107,19 +107,19 @@ void __init vexpress_osc_of_setup(struct device_node *node)
 	osc->func = vexpress_config_func_get_by_node(node);
 	if (!osc->func) {
 		pr_err("Failed to obtain config func for node '%s'!\n",
-				node->full_name);
+				node->dn->full_name);
 		goto error;
 	}
 
-	if (of_property_read_u32_array(node, "freq-range", range,
+	if (gufi_property_read_u32_array(node, "freq-range", range,
 			ARRAY_SIZE(range)) == 0) {
 		osc->rate_min = range[0];
 		osc->rate_max = range[1];
 	}
 
-	of_property_read_string(node, "clock-output-names", &init.name);
+	gufi_property_read_string(node, "clock-output-names", &init.name);
 	if (!init.name)
-		init.name = node->full_name;
+		init.name = node->dn->full_name;
 
 	init.ops = &vexpress_osc_ops;
 	init.flags = CLK_IS_ROOT;
