@@ -28,7 +28,7 @@
 #define VEXPRESS_CONFIG_MAX_BRIDGES 2
 
 struct vexpress_config_bridge {
-	struct device_node *node;
+	struct gufi_device_node *node;
 	struct vexpress_config_bridge_info *info;
 	struct list_head transactions;
 	spinlock_t transactions_lock;
@@ -39,7 +39,7 @@ static DECLARE_BITMAP(vexpress_config_bridges_map,
 static DEFINE_MUTEX(vexpress_config_bridges_mutex);
 
 struct vexpress_config_bridge *vexpress_config_bridge_register(
-		struct device_node *node,
+		struct gufi_device_node *node,
 		struct vexpress_config_bridge_info *info)
 {
 	struct vexpress_config_bridge *bridge;
@@ -93,33 +93,33 @@ struct vexpress_config_func {
 };
 
 struct vexpress_config_func *__vexpress_config_func_get(struct device *dev,
-		struct device_node *node)
+		struct gufi_device_node *node)
 {
-	struct device_node *bridge_node;
+	struct gufi_device_node *bridge_node;
 	struct vexpress_config_func *func;
 	int i;
 
-	if (WARN_ON(dev && node && dev->of_node != node))
+	if (WARN_ON(dev && node && dev->of_node != node->dn))
 		return NULL;
-	if (dev && !node)
-		node = dev->of_node;
+	if (dev && !node->dn)
+		node->dn = dev->of_node;
 
 	func = kzalloc(sizeof(*func), GFP_KERNEL);
 	if (!func)
 		return NULL;
 
-	bridge_node = of_node_get(node);
+	bridge_node = gufi_node_get(node);
 	while (bridge_node) {
-		const __be32 *prop = of_get_property(bridge_node,
+		const __be32 *prop = gufi_get_property(bridge_node,
 				"arm,vexpress,config-bridge", NULL);
 
 		if (prop) {
-			bridge_node = of_find_node_by_phandle(
+			bridge_node = gufi_find_node_by_phandle(
 					be32_to_cpup(prop));
 			break;
 		}
 
-		bridge_node = of_get_next_parent(bridge_node);
+		bridge_node = gufi_get_next_parent(bridge_node);
 	}
 
 	mutex_lock(&vexpress_config_bridges_mutex);
@@ -137,7 +137,7 @@ struct vexpress_config_func *__vexpress_config_func_get(struct device *dev,
 	mutex_unlock(&vexpress_config_bridges_mutex);
 
 	if (!func->func) {
-		of_node_put(node);
+		gufi_node_put(node);
 		kfree(func);
 		return NULL;
 	}
@@ -149,7 +149,7 @@ EXPORT_SYMBOL(__vexpress_config_func_get);
 void vexpress_config_func_put(struct vexpress_config_func *func)
 {
 	func->bridge->info->func_put(func->func);
-	of_node_put(func->bridge->node);
+	gufi_node_put(func->bridge->node);
 	kfree(func);
 }
 EXPORT_SYMBOL(vexpress_config_func_put);
