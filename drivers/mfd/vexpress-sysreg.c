@@ -127,13 +127,13 @@ static void vexpress_sysreg_find_prop(struct gufi_device_node *node,
 	}
 }
 
-unsigned __vexpress_get_site(struct device *dev, struct device_node *node)
+unsigned __vexpress_get_site(struct device *dev, struct gufi_device_node *node)
 {
 	u32 site = 0;
 
-	WARN_ON(dev && node && dev->of_node != node);
-	if (dev && !node)
-		node = dev->of_node;
+	WARN_ON(dev && node && dev->of_node != node->dn);
+	if (dev && !node->dn)
+		node->dn = dev->of_node;
 
 	if (node) {
 		vexpress_sysreg_find_prop(node, "arm,vexpress,site", &site);
@@ -165,7 +165,7 @@ static u32 *vexpress_sysreg_config_data;
 static int vexpress_sysreg_config_tries;
 
 static void *vexpress_sysreg_config_func_get(struct device *dev,
-		struct device_node *node)
+		struct gufi_device_node *node)
 {
 	struct vexpress_sysreg_config_func *config_func;
 	u32 site;
@@ -175,15 +175,15 @@ static void *vexpress_sysreg_config_func_get(struct device *dev,
 	int err = -EFAULT;
 
 	if (node) {
-		of_node_get(node);
+		gufi_node_get(node);
 		vexpress_sysreg_find_prop(node, "arm,vexpress,site", &site);
 		vexpress_sysreg_find_prop(node, "arm,vexpress,position",
 				&position);
 		vexpress_sysreg_find_prop(node, "arm,vexpress,dcc", &dcc);
-		err = of_property_read_u32_array(node,
+		err = gufi_property_read_u32_array(node,
 				"arm,vexpress-sysreg,func", func_device,
 				ARRAY_SIZE(func_device));
-		of_node_put(node);
+		gufi_node_put(node);
 	} else if (dev && dev->bus == &platform_bus_type) {
 		struct platform_device *pdev = to_platform_device(dev);
 
@@ -315,7 +315,7 @@ static void vexpress_sysreg_config_complete(unsigned long data)
 }
 
 
-void vexpress_sysreg_setup(struct device_node *node)
+void vexpress_sysreg_setup(struct gufi_device_node *node)
 {
 	if (WARN_ON(!vexpress_sysreg_base))
 		return;
@@ -346,7 +346,7 @@ void __init vexpress_sysreg_of_early_init(void)
 	node = gufi_find_compatible_node(NULL, NULL, "arm,vexpress-sysreg");
 	if (node) {
 		vexpress_sysreg_base = gufi_iomap(node, 0);
-		vexpress_sysreg_setup(node->dn);
+		vexpress_sysreg_setup(node);
 	}
 }
 
@@ -461,6 +461,7 @@ DEVICE_ATTR(sys_id, S_IRUGO, vexpress_sysreg_sys_id_show, NULL);
 static int vexpress_sysreg_probe(struct platform_device *pdev)
 {
 	int err;
+	struct gufi_device_node *gdn;
 	struct resource *res = platform_get_resource(pdev,
 			IORESOURCE_MEM, 0);
 
@@ -473,7 +474,9 @@ static int vexpress_sysreg_probe(struct platform_device *pdev)
 	if (!vexpress_sysreg_base) {
 		vexpress_sysreg_base = devm_ioremap(&pdev->dev, res->start,
 				resource_size(res));
-		vexpress_sysreg_setup(pdev->dev.of_node);
+		gdn = gufi_look_for_node(pdev->dev.of_node,
+					 ACPI_HANDLE(&pdev->dev));
+		vexpress_sysreg_setup(gdn);
 	}
 
 	if (!vexpress_sysreg_base) {

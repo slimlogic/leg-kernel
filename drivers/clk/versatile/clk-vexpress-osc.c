@@ -133,7 +133,7 @@ void __init vexpress_osc_of_setup(struct gufi_device_node *node)
 		goto error;
 	}
 
-	of_clk_add_provider(node, of_clk_src_simple_get, clk);
+	of_clk_add_provider(node->dn, of_clk_src_simple_get, clk);
 
 	pr_debug("Registered clock '%s'\n", init.name);
 
