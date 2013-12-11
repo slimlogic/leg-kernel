@@ -44,6 +44,8 @@ extern struct gufi_device_node *gufi_node_get(struct gufi_device_node *gdn);
 extern void gufi_node_put(struct gufi_device_node *gdn);
 
 /* Search for nodes in interesting ways */
+extern struct gufi_device_node *gufi_look_for_node(struct device_node *dn,
+						   struct acpi_device_id *id);
 extern struct gufi_device_node *gufi_find_compatible_node(
 						struct gufi_device_node *gdn,
 						const char *type,
@@ -55,16 +57,19 @@ extern struct gufi_device_node *gufi_get_next_parent(
 						struct gufi_device_node *node);
 
 /* Retrieve values for specific properties */
+extern const void *gufi_get_property(const struct gufi_device_node *node,
+				     const char *name,
+				     int *lenp);
+extern int gufi_property_read_string(struct gufi_device_node *np,
+			             const char *propname,
+			             const char **out_string);
+extern int gufi_property_read_u32(const struct gufi_device_node *np,
+				  const char *propname,
+				  u32 *out_value);
 extern int gufi_property_read_u32_array(const struct gufi_device_node *np,
 				        const char *propname,
 				        u32 *out_values,
 				        size_t sz);
-extern int gufi_property_read_string(struct gufi_device_node *np,
-			             const char *propname,
-			             const char **out_string);
-extern const void *gufi_get_property(const struct gufi_device_node *node,
-				     const char *name,
-				     int *lenp);
 
 /* Addressing routines */
 extern void __iomem *gufi_iomap(struct gufi_device_node *gdn, int index);

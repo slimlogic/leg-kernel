@@ -168,6 +168,7 @@ void gufi_node_put(struct gufi_device_node *gdn)
 }
 EXPORT_SYMBOL(gufi_node_put);
 
+
 /* Tree walking routines */
 
 /**
@@ -192,7 +193,7 @@ EXPORT_SYMBOL(gufi_get_next_parent);
 /* Search for nodes in interesting ways */
 
 /**
- * __gufi_look_for_node	- All gufi_device_nodes a kept in a list.
+ * gufi_look_for_node	- All gufi_device_nodes a kept in a list.
  * 			  Given either a device_node or acpi_device_id
  * 			  (or both), search the list for a matching
  * 			  node.  If there is no node, make one and
@@ -203,8 +204,8 @@ EXPORT_SYMBOL(gufi_get_next_parent);
  * Returns a pointer to the node found, if any, or creates a new node
  * and returns the address to it.
  */
-static struct gufi_device_node *__gufi_look_for_node(struct device_node *dn,
-						     struct acpi_device_id *id)
+struct gufi_device_node *gufi_look_for_node(struct device_node *dn,
+					    struct acpi_device_id *id)
 {
 	struct gufi_device_node *pos;
 	struct gufi_device_node *node = NULL;
@@ -212,7 +213,7 @@ static struct gufi_device_node *__gufi_look_for_node(struct device_node *dn,
 	list_for_each_entry(pos, &__gdn_list, entry) {
 		if (pos->dn == dn && pos->id == id) {
 			node = pos;
-			break;
+			return node;
 		}
 	}
 
@@ -226,6 +227,7 @@ static struct gufi_device_node *__gufi_look_for_node(struct device_node *dn,
 	}
 	return node;
 }
+EXPORT_SYMBOL(gufi_look_for_node);
 
 /**
  * __gufi_find_acpi_compatible - Emulate the DT of_find_compatible_node
@@ -286,7 +288,7 @@ struct gufi_device_node *gufi_find_compatible_node(
 		     dn = of_find_compatible_node(dn, type, compatible),
 		     id = __gufi_find_acpi_compatible(gdn, type, compatible)
 		    );
-	node = __gufi_look_for_node(dn, id);
+	node = gufi_look_for_node(dn, id);
 	gufi_node_put(node);
 	return node;
 }
@@ -308,6 +310,68 @@ EXPORT_SYMBOL(gufi_find_node_by_phandle);
 
 
 /* Retrieve values for specific properties */
+
+/**
+ * gufi_get_property - Find a pointer to a node property
+ * @np:		device node from which to get the property
+ * @name:	name of the property to get
+ *
+ * Returns the value of the property of the node with the given name.
+ */
+const void *gufi_get_property(const struct gufi_device_node *np,
+			      const char *name,
+			      int *lenp)
+{
+	/* TODO: not implemented yet */
+	return NULL;
+}
+EXPORT_SYMBOL(gufi_get_property);
+
+/**
+ * gufi_property_read_string - Find and read a string from a property
+ * @np:		device node from which the property value is to be read.
+ * @propname:	name of the property to be searched.
+ * @out_string:	pointer to null terminated return string, modified only if
+ *		return value is 0.
+ *
+ * Search for a property in a device tree node and retrieve a null
+ * terminated string value (pointer to data, not a copy). Returns 0 on
+ * success, -EINVAL if the property does not exist, -ENODATA if property
+ * does not have a value, and -EILSEQ if the string is not null-terminated
+ * within the length of the property data.
+ *
+ * The out_string pointer is modified only if a valid string can be decoded.
+ */
+int gufi_property_read_string(struct gufi_device_node *np,
+			      const char *propname,
+			      const char **out_string)
+{
+	/* TODO: not implemented yet */
+	return -ENOSYS;
+}
+EXPORT_SYMBOL(gufi_property_read_string);
+
+/**
+ * gufi_property_read_u32 - Find and read a 32 bit integer from a property.
+ *
+ * @np:		device node from which the property value is to be read.
+ * @propname:	name of the property to be searched.
+ * @out_value:	pointer to return value, modified only if return value is 0.
+ *
+ * Search for a property in a device node and read a 32-bit value from
+ * it. Returns 0 on success, -EINVAL if the property does not exist,
+ * -ENODATA if property does not have a value, and -EOVERFLOW if the
+ * property data isn't large enough.
+ *
+ * The out_value is modified only if a valid u32 value can be decoded.
+ */
+int gufi_property_read_u32(const struct gufi_device_node *np,
+			   const char *propname, u32 *out_value)
+{
+	/* TODO: not implemented yet */
+	return -ENOSYS;
+}
+EXPORT_SYMBOL(gufi_property_read_u32);
 
 /**
  * gufi_property_read_u32_array - Find and read an array of 32 bit integers
@@ -333,44 +397,6 @@ int gufi_property_read_u32_array(const struct gufi_device_node *np,
 	return -ENOSYS;
 }
 EXPORT_SYMBOL(gufi_property_read_u32_array);
-
-/**
- * of_property_read_string - Find and read a string from a property
- * @np:		device node from which the property value is to be read.
- * @propname:	name of the property to be searched.
- * @out_string:	pointer to null terminated return string, modified only if
- *		return value is 0.
- *
- * Search for a property in a device tree node and retrieve a null
- * terminated string value (pointer to data, not a copy). Returns 0 on
- * success, -EINVAL if the property does not exist, -ENODATA if property
- * does not have a value, and -EILSEQ if the string is not null-terminated
- * within the length of the property data.
- *
- * The out_string pointer is modified only if a valid string can be decoded.
- */
-int gufi_property_read_string(struct gufi_device_node *np,
-			      const char *propname,
-			      const char **out_string)
-{
-	/* TODO: not implemented yet */
-	return -ENOSYS;
-}
-EXPORT_SYMBOL(gufi_property_read_string);
-
-
-/*
- * Find a property with a given name for a given node
- * and return the value.
- */
-const void *gufi_get_property(const struct gufi_device_node *np,
-			      const char *name,
-			      int *lenp)
-{
-	/* TODO: not implemented yet */
-	return NULL;
-}
-EXPORT_SYMBOL(of_get_property);
 
 
 
@@ -421,6 +447,12 @@ struct gufi_device_node *gufi_node_get(struct gufi_device_node *gdn)
 static inline void gufi_node_put(struct gufi_device_node *gdn) { return; }
 
 /* Search for nodes in interesting ways */
+static struct gufi_device_node *gufi_look_for_node(struct device_node *dn,
+						   struct acpi_device_id *id)
+{
+	return NULL;
+}
+
 static inline struct gufi_device_node *gufi_find_compatible_node(
 						struct gufi_device_node *gdn,
 						const char *type,
