@@ -37,6 +37,9 @@ static const struct acpi_device_id acpi_platform_device_ids[] = {
 	{ "LNRO0009" }, /* vexpress-sysreg */
 	{ "LNRO000A" }, /* uart-pl011 */
 
+	/* minnowboard devices */
+	{ "MNW0002" },	/* experimental */
+	{ "MNW0003" },	/* experimental */
 	{ }
 };
 
