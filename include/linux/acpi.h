@@ -420,6 +420,14 @@ static inline bool acpi_driver_match_device(struct device *dev,
 
 int acpi_device_uevent_modalias(struct device *, struct kobj_uevent_env *);
 int acpi_device_modalias(struct device *, char *, int);
+struct acpi_dsm_entry {
+	char *key;
+	char *value;
+};
+
+int acpi_dsm_lookup_value(acpi_handle handle,
+		const char *tag, int index,
+		struct acpi_dsm_entry *entry);
 
 #define ACPI_PTR(_ptr)	(_ptr)
 

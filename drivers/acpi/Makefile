@@ -15,6 +15,7 @@ obj-$(CONFIG_X86)		+= blacklist.o
 # ACPI Core Subsystem (Interpreter)
 #
 obj-y				+= acpi.o \
+					acpi_keyvalue.o \
 					acpica/
 
 # All the builtin files are in the "acpi." module_param namespace.
