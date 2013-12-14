@@ -93,23 +93,25 @@ struct vexpress_config_func {
 };
 
 struct vexpress_config_func *__vexpress_config_func_get(struct device *dev,
-		struct gufi_device_node *node)
+		struct device_node *node)
 {
+	struct gufi_device_node *gdn;
 	struct gufi_device_node *bridge_node;
 	struct vexpress_config_func *func;
 	int i;
 
-	if (WARN_ON(dev && node && dev->of_node != node->dn))
+	if (WARN_ON(dev && node && dev->of_node != node))
 		return NULL;
-	if (dev && !node->dn)
-		node->dn = dev->of_node;
 
 	func = kzalloc(sizeof(*func), GFP_KERNEL);
 	if (!func)
 		return NULL;
 
-	bridge_node = gufi_node_get(node);
+	printk(KERN_DEBUG "GUFI: __vexpress_config_func_get: node = 0x%p\n", node);
+	gdn = gufi_look_for_node(node, NULL);
+	bridge_node = gufi_node_get(gdn);
 	while (bridge_node) {
+		printk(KERN_DEBUG "GUFI: __vexpress_config_func_get: bridge_node = 0x%p\n", bridge_node);
 		const __be32 *prop = gufi_get_property(bridge_node,
 				"arm,vexpress,config-bridge", NULL);
 
@@ -130,14 +132,14 @@ struct vexpress_config_func *__vexpress_config_func_get(struct device *dev,
 		if (test_bit(i, vexpress_config_bridges_map) &&
 				bridge->node == bridge_node) {
 			func->bridge = bridge;
-			func->func = bridge->info->func_get(dev, node);
+			func->func = bridge->info->func_get(dev, gdn);
 			break;
 		}
 	}
 	mutex_unlock(&vexpress_config_bridges_mutex);
 
 	if (!func->func) {
-		gufi_node_put(node);
+		gufi_node_put(gdn);
 		kfree(func);
 		return NULL;
 	}

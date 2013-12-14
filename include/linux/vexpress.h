@@ -90,7 +90,7 @@ void vexpress_config_complete(struct vexpress_config_bridge *bridge,
 struct vexpress_config_func;
 
 struct vexpress_config_func *__vexpress_config_func_get(struct device *dev,
-		struct gufi_device_node *node);
+		struct device_node *node);
 #define vexpress_config_func_get_by_dev(dev) \
 		__vexpress_config_func_get(dev, NULL)
 #define vexpress_config_func_get_by_node(node) \
