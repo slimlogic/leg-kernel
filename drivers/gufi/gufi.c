@@ -117,6 +117,9 @@ static LIST_HEAD(__gdn_list);
  */
 static acpi_status __gufi_get_mem32fixed(struct acpi_resource *res, void *data)
 {
+	if (!res)
+		return AE_ERROR;
+
 	if (res->type == ACPI_RESOURCE_TYPE_FIXED_MEMORY32) {
 		return AE_OK;
 	}
@@ -135,6 +138,9 @@ static acpi_status __gufi_get_mem32fixed(struct acpi_resource *res, void *data)
 static struct gufi_device_node *__gufi_look_for_acpi(struct acpi_device *an)
 {
 	struct gufi_device_node *pos;
+
+	if (!an)
+		return NULL;
 
 	list_for_each_entry(pos, &__gdn_list, entry) {
 		if (pos->an == an) {
@@ -156,6 +162,9 @@ static struct gufi_device_node *__gufi_look_for_acpi(struct acpi_device *an)
 static struct gufi_device_node *__gufi_look_for_dt(struct device_node *dn)
 {
 	struct gufi_device_node *pos;
+
+	if (!dn)
+		return NULL;
 
 	list_for_each_entry(pos, &__gdn_list, entry) {
 		if (pos->dn == dn) {
@@ -299,27 +308,38 @@ EXPORT_SYMBOL(gufi_get_next_parent);
 struct gufi_device_node *gufi_look_for_node(struct device_node *dn,
 					    struct acpi_device *an)
 {
-	struct gufi_device_node *node = NULL;
+	struct gufi_device_node *gdn = NULL;
 	struct gufi_device_node *ga = NULL;
 	struct gufi_device_node *gd = NULL;
 	enum search_preference search = search_first;
+
+	pr_debug("GUFI: entering gufi_look_for_node\n");
+	pr_debug("GUFI: gufi_look_for_node: dn = 0x%p\n", dn);
+	pr_debug("GUFI: gufi_look_for_node: an = 0x%p\n", an);
 
 	run_in_order(search,
 		     ga = __gufi_look_for_acpi(an),
 		     gd = __gufi_look_for_dt(dn)
 		    );
+	pr_debug("GUFI: gufi_look_for_node: ga = 0x%p\n", ga);
+	pr_debug("GUFI: gufi_look_for_node: gd = 0x%p\n", gd);
 	if (ga || gd )
 		return ga ? ga : gd;
 
 	if (!(ga || gd)) {
-		node = kzalloc(sizeof(struct gufi_device_node), GFP_KERNEL);
-		if (node) {
-			node->dn = dn;
-			node->an = an;
-			list_add_tail(&node->entry, &__gdn_list);
+		gdn = kzalloc(sizeof(struct gufi_device_node), GFP_KERNEL);
+		if (gdn) {
+			pr_debug("GUFI: gufi_look_for_node: gdn = 0x%p\n", gdn);
+			gdn->dn = dn;
+			gdn->an = an;
+			//kref_init(&gdn->kref);
+			list_add_tail(&gdn->entry, &__gdn_list);
 		}
 	}
-	return node;
+
+	pr_debug("GUFI: leaving gufi_look_for_node\n");
+
+	return gdn;
 }
 EXPORT_SYMBOL(gufi_look_for_node);
 
@@ -372,17 +392,25 @@ static struct acpi_device *__gufi_find_acpi_compatible(
 	void *device = NULL;
 	acpi_handle handle;
 
+	pr_debug("GUFI: entering __gufi_find_acpi_compatible\n");
+
 	/*
 	 * Traverse the namespace looking for a device with the right
 	 * compatible key-value pair.  Will need to invoke the _PRP method
 	 * to retrieve all key-value pairs and get the compatible property.
 	 */
-	handle = gdn->an ? gdn->an->handle : 0;
+	if (gdn)
+		handle = gdn->an ? gdn->an->handle : 0;
+	else
+		handle = ACPI_ROOT_OBJECT;
 	acpi_walk_namespace(ACPI_TYPE_DEVICE, handle, ACPI_UINT32_MAX,
 			    __gufi_acpi_find_callback, NULL,
 			    (void *)compatible, &device);
 
 	an = (struct acpi_device *)device;
+
+	pr_debug("GUFI: leaving __gufi_find_acpi_compatible\n");
+
 	return an;
 }
 
@@ -411,13 +439,18 @@ struct gufi_device_node *gufi_find_compatible_node(
 	struct acpi_device *an = NULL;
 	struct gufi_device_node *node;
 
-	dn = (gdn == NULL) ? NULL : gdn->dn;
+	pr_debug("GUFI: entering gufi_find_compatible_node\n");
+
+	dn = gdn ? gdn->dn : NULL;
 	run_in_order(search,
 		     an = __gufi_find_acpi_compatible(gdn, type, compatible),
 		     dn = of_find_compatible_node(dn, type, compatible)
 		    );
 	node = gufi_look_for_node(dn, an);
 	gufi_node_put(node);
+
+	pr_debug("GUFI: leaving gufi_find_compatible_node\n");
+
 	return node;
 }
 EXPORT_SYMBOL(gufi_find_compatible_node);
@@ -495,18 +528,29 @@ EXPORT_SYMBOL(gufi_find_node_by_phandle);
 /**
  * __gufi_acpi_get_property - helper function for calling ACPI properly in
  * 			      order to get a pointer to any property value
- * @np:		device node from which to get the property
+ * @gdn:	device node from which to get the property
  * @name:	name of the property to get
  *
  * Returns the value of the property of the node with the given name.
  */
-const void *__gufi_acpi_get_property(const struct gufi_device_node *np,
+const void *__gufi_acpi_get_property(const struct gufi_device_node *gdn,
 				     const char *name,
 				     int *lenp)
 {
 	const union acpi_object *obj;
 
-	if (acpi_dev_get_property(np->an, name, ACPI_TYPE_ANY, &obj))
+	pr_debug("GUFI: entering __gufi_acpi_get_property\n");
+
+	if  (!gdn || !gdn->an || !gdn->an->handle)
+		return NULL;
+
+	pr_debug("GUFI: __gufi_acpi_get_property: gdn = 0x%p\n", gdn);
+	pr_debug("GUFI: __gufi_acpi_get_property: gdn->an = 0x%p\n", gdn->an);
+	pr_debug("GUFI: __gufi_acpi_get_property: gdn->an->device_type = 0x%0x\n", gdn->an->device_type);
+	pr_debug("GUFI: __gufi_acpi_get_property: gdn->an->handle = 0x%p\n", gdn->an->handle);
+	pr_debug("GUFI: __gufi_acpi_get_property: gdn->an->properties = 0x%p\n", gdn->an->properties);
+	pr_debug("GUFI: __gufi_acpi_get_property: name = %s\n", name);
+	if (acpi_dev_get_property(gdn->an, name, ACPI_TYPE_ANY, &obj))
 		return NULL;
 	else
 		return (const void *)obj;
@@ -514,21 +558,23 @@ const void *__gufi_acpi_get_property(const struct gufi_device_node *np,
 
 /**
  * gufi_get_property - Find a pointer to a node property
- * @np:		device node from which to get the property
+ * @gdn:	device node from which to get the property
  * @name:	name of the property to get
  *
  * Returns the value of the property of the node with the given name.
  */
-const void *gufi_get_property(const struct gufi_device_node *np,
+const void *gufi_get_property(const struct gufi_device_node *gdn,
 			      const char *name,
 			      int *lenp)
 {
 	enum search_preference search = search_first;
+	struct device_node *dn;
 	const void *ptr;
 
+	dn = gdn ? gdn->dn : NULL;
 	run_in_order(search,
-		     ptr = __gufi_acpi_get_property(np, name, lenp),
-		     ptr = of_get_property(np->dn, name, lenp)
+		     ptr = __gufi_acpi_get_property(gdn, name, lenp),
+		     ptr = of_get_property(gdn->dn, name, lenp)
 		    );
 	return ptr;
 }
@@ -536,7 +582,7 @@ EXPORT_SYMBOL(gufi_get_property);
 
 /**
  * gufi_property_read_string - Find and read a string from a property
- * @np:		device node from which the property value is to be read.
+ * @gdn:	device node from which the property value is to be read.
  * @propname:	name of the property to be searched.
  * @out_string:	pointer to null terminated return string, modified only if
  *		return value is 0.
@@ -549,17 +595,24 @@ EXPORT_SYMBOL(gufi_get_property);
  *
  * The out_string pointer is modified only if a valid string can be decoded.
  */
-int gufi_property_read_string(struct gufi_device_node *np,
+int gufi_property_read_string(struct gufi_device_node *gdn,
 			      const char *propname,
 			      const char **out_string)
 {
 	enum search_preference search = search_first;
+	struct device_node *dn;
+	struct acpi_device *an;
 
+	if (gdn) {
+		dn = gdn->dn;
+		an = gdn->an;
+	} else {
+		return -EINVAL;
+	}
 	run_in_order(search,
-		     return acpi_dev_get_property_string(np->an, propname, \
+		     return acpi_dev_get_property_string(an, propname, \
 		     					 out_string),
-		     return of_property_read_string(np->dn, propname, \
-		     				    out_string)
+		     return of_property_read_string(dn, propname, out_string)
 		    );
 	return -ENOSYS;
 }
@@ -568,7 +621,7 @@ EXPORT_SYMBOL(gufi_property_read_string);
 /**
  * gufi_property_read_u32 - Find and read a 32 bit integer from a property.
  *
- * @np:		device node from which the property value is to be read.
+ * @gdn:	device node from which the property value is to be read.
  * @propname:	name of the property to be searched.
  * @out_value:	pointer to return value, modified only if return value is 0.
  *
@@ -579,15 +632,23 @@ EXPORT_SYMBOL(gufi_property_read_string);
  *
  * The out_value is modified only if a valid u32 value can be decoded.
  */
-int gufi_property_read_u32(const struct gufi_device_node *np,
+int gufi_property_read_u32(const struct gufi_device_node *gdn,
 			   const char *propname, u32 *out_value)
 {
 	enum search_preference search = search_first;
+	struct device_node *dn;
+	struct acpi_device *an;
+
+	if (gdn) {
+		dn = gdn->dn;
+		an = gdn->an;
+	} else {
+		return -EINVAL;
+	}
 
 	run_in_order(search,
-		     return acpi_dev_get_property_u32(np->an, propname, \
-		     				      out_value),
-		     return of_property_read_u32(np->dn, propname, out_value)
+		     return acpi_dev_get_property_u32(an, propname, out_value),
+		     return of_property_read_u32(dn, propname, out_value)
 		    );
 	return -ENOSYS;
 }
@@ -597,7 +658,7 @@ EXPORT_SYMBOL(gufi_property_read_u32);
  * gufi_property_read_u32_array - Find and read an array of 32 bit integers
  * from a property.
  *
- * @np:		device node from which the property value is to be read.
+ * @gdn:	device node from which the property value is to be read.
  * @propname:	name of the property to be searched.
  * @out_values:	pointer to return value, modified only if return value is 0.
  * @sz:		number of array elements to read
@@ -609,16 +670,26 @@ EXPORT_SYMBOL(gufi_property_read_u32);
  *
  * The out_values is modified only if a valid u32 value can be decoded.
  */
-int gufi_property_read_u32_array(const struct gufi_device_node *np,
+int gufi_property_read_u32_array(const struct gufi_device_node *gdn,
 			         const char *propname, u32 *out_values,
 			         size_t sz)
 {
 	enum search_preference search = search_first;
+	struct device_node *dn;
+	struct acpi_device *an;
+
+	if (gdn) {
+		dn = gdn->dn;
+		an = gdn->an;
+	} else {
+		return -EINVAL;
+	}
+
 
 	run_in_order(search,
-		     return acpi_dev_get_property_array_u32(np->an, propname, \
+		     return acpi_dev_get_property_array_u32(an, propname, \
 		     				            out_values, sz),
-		     return of_property_read_u32_array(np->dn, propname, \
+		     return of_property_read_u32_array(dn, propname, \
 		     				       out_values, sz)
 		    );
 	return -ENOSYS;
@@ -640,6 +711,13 @@ void __iomem *__gufi_acpi_iomap(struct gufi_device_node *gdn, int index)
 	acpi_status status;
 	struct acpi_resource_fixed_memory32 data;
 
+	pr_debug("GUFI: entering __gufi_acpi_iomap\n");
+
+	if (!gdn || !gdn->an)
+		return NULL;
+	pr_debug("GUFI: __gufi_acpi_iomap: gdn = 0x%p\n", gdn);
+	pr_debug("GUFI: __gufi_acpi_iomap: gdn->an = 0x%p\n", gdn->an);
+
 	/* TODO: use acpi_get_current_resources() instead? */
 	memset(&data, 0, sizeof(struct acpi_resource_fixed_memory32));
 	status = acpi_walk_resources(gdn->an->handle, METHOD_NAME__CRS,
@@ -647,6 +725,9 @@ void __iomem *__gufi_acpi_iomap(struct gufi_device_node *gdn, int index)
 	if (ACPI_SUCCESS(status))
 		return acpi_os_map_memory((acpi_physical_address)data.address,
 					  (acpi_size)data.address_length);
+
+	pr_debug("GUFI: leaving __gufi_acpi_iomap\n");
+
 	return NULL;
 }
 
@@ -662,10 +743,18 @@ void __iomem *gufi_iomap(struct gufi_device_node *gdn, int index)
 	enum search_preference search = search_first;
 	void __iomem *ptr;
 
+	pr_debug("GUFI: entering gufi_iomap\n");
+
+	if (!gdn)
+		return NULL;
+
 	run_in_order(search,
 		     ptr = __gufi_acpi_iomap(gdn, index),
 		     ptr = of_iomap(gdn->dn, index)
 		    );
+
+	pr_debug("GUFI: leaving gufi_iomap\n");
+
 	return ptr;
 }
 

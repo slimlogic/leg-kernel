@@ -2,6 +2,7 @@
 # Makefile for the Grand Unified Firmware Interface
 #
 
+CFLAGS_gufi.o := -DDEBUG
 CFLAGS_gufi_of_test.o := -DDEBUG
 CFLAGS_gufi_acpi_test.o := -DDEBUG
 
