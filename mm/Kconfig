@@ -577,3 +577,6 @@ config PGTABLE_MAPPING
 
 	  You can check speed with zsmalloc benchmark[1].
 	  [1] https://github.com/spartacus06/zsmalloc
+
+config GENERIC_EARLY_IOREMAP
+	bool
