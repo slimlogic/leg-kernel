@@ -74,6 +74,15 @@ config MTD_PHYSMAP_OF
 	  physically into the CPU's memory. The mapping description here is
 	  taken from OF device tree.
 
+config MTD_PHYSMAP_ACPI
+	tristate "Flash device in physical memory map based on ACPI description"
+	depends on ACPI && (MTD_CFI || MTD_JEDECPROBE || MTD_ROM)
+	help
+	  This provides a 'mapping' driver which allows the NOR Flash and
+	  ROM driver code to communicate with chips which are mapped
+	  physically into the CPU's memory. The mapping description here is
+	  taken from DSDT ACPI table.
+
 config MTD_PMC_MSP_EVM
 	tristate "CFI Flash device mapped on PMC-Sierra MSP"
 	depends on PMC_MSP && MTD_CFI
