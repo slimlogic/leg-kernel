@@ -112,12 +112,11 @@ struct vexpress_config_func *__vexpress_config_func_get(struct device *dev,
 	bridge_node = gufi_node_get(gdn);
 	while (bridge_node) {
 		printk(KERN_DEBUG "GUFI: __vexpress_config_func_get: bridge_node = 0x%p\n", bridge_node);
-		const __be32 *prop = gufi_get_property(bridge_node,
+		u64 *prop = gufi_get_property(bridge_node,
 				"arm,vexpress,config-bridge", NULL);
 
 		if (prop) {
-			bridge_node = gufi_find_node_by_phandle(
-					be32_to_cpup(prop));
+			bridge_node = gufi_find_node_by_ref(prop);
 			break;
 		}
 
