@@ -122,3 +122,18 @@ void setup_mm_for_reboot(void)
 	local_flush_tlb_all();
 #endif
 }
+
+void idmap_prepare(void)
+{
+	/* Take out a flat memory mapping. */
+	setup_mm_for_reboot();
+
+	/* Clean and invalidate caches */
+	flush_cache_all();
+
+	/* Turn off caching */
+	cpu_proc_fin();
+
+	/* Push out any further dirty data, and ensure cache is empty */
+	flush_cache_all();
+}
