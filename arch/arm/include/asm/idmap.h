@@ -10,5 +10,6 @@
 extern pgd_t *idmap_pgd;
 
 void setup_mm_for_reboot(void);
+void idmap_prepare(void);
 
 #endif	/* __ASM_IDMAP_H */
