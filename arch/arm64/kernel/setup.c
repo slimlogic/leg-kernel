@@ -172,10 +172,6 @@ static void __init setup_machine_fdt(phys_addr_t dt_phys)
 
 	/* Retrieve various information from the /chosen node */
 	of_scan_flat_dt(early_init_dt_scan_chosen, boot_command_line);
-#ifdef CONFIG_ACPI
-	/* Retrieve ACPI pointers from /chosen node */
-	of_scan_flat_dt(early_init_dt_scan_acpi, &acpi_arm_rsdp_info);
-#endif
 	/* Initialize {size,address}-cells info */
 	of_scan_flat_dt(early_init_dt_scan_root, NULL);
 	/* Setup memory, calling early_init_dt_add_memory_arch */
@@ -314,7 +310,7 @@ static int __init arm64_device_init(void)
 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
 	return 0;
 }
-arch_initcall(arm64_device_init);
+subsys_initcall_sync(arm64_device_init);
 
 DEFINE_PER_CPU(struct cpuinfo_arm, cpu_data);
 
