@@ -1,5 +1,5 @@
 /*
- * gufi.h - Grand Unified Firmware Interface
+ * Grand Unified Firmware Interface
  *
  * Copyright (C) 2014 Al Stone <al.stone@linaro.org>
  *
@@ -22,37 +22,14 @@
  * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
  */
 
-#ifndef _LINUX_GUFI_H
-#define _LINUX_GUFI_H
-
 #ifdef CONFIG_GUFI
 
-#include <linux/acpi.h>
-#include <linux/errno.h>
-#include <linux/kref.h>
-#include <linux/list.h>
-#include <linux/of.h>
-#include <linux/types.h>
+#include "acpi_protocol.h"
 
-struct gufi_device_node {
-	struct device_node *dn;
-	struct acpi_device_id *id;
-	struct kref kref;
-	struct list_head entry;
-};
-
-struct gufi_protocol {
-	const char *name;
-	struct list_head entry;
-
-	struct gufi_device_node *(*find_first_node)(const char *name);
-};
-
-extern int gufi_register_protocol(struct gufi_protocol *prot);
-extern void gufi_unregister_protocol(struct gufi_protocol *prot);
-
-extern struct gufi_device_node *gufi_find_first_node(const char *name);
+struct gufi_device_node *gufi_acpi_find_first_node(const char *name)
+{
+	/* TODO */
+	return NULL;
+}
 
 #endif	/* CONFIG_GUFI */
-
-#endif	/*_LINUX_GUFI_H */
