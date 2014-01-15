@@ -27,6 +27,7 @@
 #include <linux/module.h>
 #include <linux/irq.h>
 #include <linux/irqdomain.h>
+#include <linux/irqchip/arm-gic.h>
 #include <linux/bootmem.h>
 #include <linux/smp.h>
 
@@ -210,6 +211,15 @@ acpi_parse_gic(struct acpi_subtable_header *header, const unsigned long end)
 	acpi_table_print_madt_entry(header);
 
 	/*
+	 * As ACPI 5.0 said, the 64-bit physical address in GIC struct at
+	 * which the processor can access this GIC. If provided, the
+	 * ???Local Interruptp controller Address??? field in  the MADT
+	 * is ignored by OSPM.
+	 */
+	if (processor->base_address)
+		acpi_lapic_addr = processor->base_address;
+
+	/*
 	 * We need to register disabled CPU as well to permit
 	 * counting disabled CPUs. This allows us to size
 	 * cpus_possible_map more accurately, to permit
@@ -229,11 +239,26 @@ acpi_parse_gic(struct acpi_subtable_header *header, const unsigned long end)
 	return 0;
 }
 
+/*
+ * Hard code here, we can not get memory size from MADT (but FDT does),
+ * this size can be refered from GICv2 spec
+ */
+#define GIC_DISTRIBUTOR_MEMORY_SIZE (SZ_4K)
+#define GIC_CPU_INTERFACE_MEMORY_SIZE (SZ_8K)
+
+/*
+ * ACPI 5.0 only provides information of GICC and GICD, use them
+ * to initialize GIC
+ */
 static int __init
 acpi_parse_gic_distributor(struct acpi_subtable_header *header,
 				const unsigned long end)
 {
 	struct acpi_madt_generic_distributor *distributor = NULL;
+	void __iomem *dist_base, *cpu_base;
+
+	if (!IS_ENABLED(CONFIG_ARM_GIC))
+		return;
 
 	distributor = (struct acpi_madt_generic_distributor *)header;
 
@@ -241,6 +266,27 @@ acpi_parse_gic_distributor(struct acpi_subtable_header *header,
 		return -EINVAL;
 
 	acpi_table_print_madt_entry(header);
+
+	/* GIC is initialised after page_init(), no need for early_ioremap */
+	dist_base = ioremap(distributor->base_address,
+				GIC_DISTRIBUTOR_MEMORY_SIZE);
+	if (!dist_base) {
+		pr_warn(PREFIX "unable to map gic dist registers\n");
+		return -ENOMEM;
+	}
+
+	/*
+	 * acpi_lapic_addr is stored in acpi_parse_madt() or acpi_parse_gic(),
+	 * so we can use it here for GIC init
+	 */
+	cpu_base = ioremap(acpi_lapic_addr, GIC_CPU_INTERFACE_MEMORY_SIZE);
+	if (!cpu_base) {
+		iounmap(dist_base);
+		pr_warn(PREFIX "unable to map gic cpu registers\n");
+		return -ENOMEM;
+	}
+
+	gic_init(distributor->gic_id, -1, dist_base, cpu_base);
 
 	return 0;
 }
@@ -252,7 +298,7 @@ acpi_parse_gic_distributor(struct acpi_subtable_header *header,
 static int __init acpi_parse_madt_gic_entries(void)
 {
 	int count;
-
+ 
 	/*
 	 * do a partial walk of MADT to determine how many CPUs
 	 * we have including disabled CPUs
@@ -423,17 +469,19 @@ static void __init acpi_process_madt(void)
 		 * Parse MADT GIC cpu interface entries
 		 */
 		error = acpi_parse_madt_gic_entries();
-		if (!error) {
-			/*
-			 * Parse MADT GIC distributor entries
-			 */
-			acpi_parse_madt_gic_distributor_entries();
-		}
+		if (!error)
+			pr_info("Using ACPI for processor (GIC) configuration information\n");
 	}
 
-	pr_info("Using ACPI for processor (GIC) configuration information\n");
-
 	return;
+}
+
+int __init acpi_gic_init(void)
+{
+	/*
+	 * Parse MADT GIC distributor entries
+	 */
+	return acpi_parse_madt_gic_distributor_entries();
 }
 
 /*
