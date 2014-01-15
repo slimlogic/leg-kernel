@@ -25,6 +25,7 @@
 #include <linux/irq.h>
 #include <linux/smp.h>
 #include <linux/init.h>
+#include <linux/acpi.h>
 #include <linux/irqchip.h>
 #include <linux/seq_file.h>
 #include <linux/ratelimit.h>
@@ -78,6 +79,11 @@ void __init set_handle_irq(void (*handle_irq)(struct pt_regs *))
 void __init init_IRQ(void)
 {
 	irqchip_init();
+
+	/* FIXME: need to fix GIC hardcoded here */
+	if (!handle_arch_irq)
+		acpi_gic_init();
+
 	if (!handle_arch_irq)
 		panic("No interrupt controller found.");
 }
