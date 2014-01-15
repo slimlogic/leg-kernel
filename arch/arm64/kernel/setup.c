@@ -43,6 +43,7 @@
 #include <linux/of_platform.h>
 #include <linux/efi.h>
 #include <linux/acpi.h>
+#include <linux/gufi.h>
 
 #include <asm/fixmap.h>
 #include <asm/cputype.h>
@@ -289,6 +290,10 @@ void __init setup_arch(char **cmdline_p)
 	unflatten_device_tree();
 
 	psci_init();
+
+#ifdef CONFIG_GUFI
+	gufi_init();
+#endif
 
 	cpu_logical_map(0) = read_cpuid_mpidr() & MPIDR_HWID_BITMASK;
 #ifdef CONFIG_SMP
