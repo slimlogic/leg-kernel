@@ -23,6 +23,7 @@
 #include <linux/timer.h>
 #include <linux/vexpress.h>
 #include <linux/acpi.h>
+#include <linux/gufi.h>
 
 #define SYS_ID			0x000
 #define SYS_SW			0x004
@@ -340,11 +341,13 @@ void __init vexpress_sysreg_early_init(void __iomem *base)
 void __init vexpress_sysreg_of_early_init(void)
 {
 	struct device_node *node;
+	struct gufi_device_node *gdn;
 
 	if (vexpress_sysreg_base)
 		return;
 
-	node = of_find_compatible_node(NULL, NULL, "arm,vexpress-sysreg");
+	gdn = gufi_find_first_node("arm,vexpress-sysreg");
+	node = gdn->dn;
 	if (node) {
 		vexpress_sysreg_base = of_iomap(node, 0);
 		vexpress_sysreg_setup(node);
