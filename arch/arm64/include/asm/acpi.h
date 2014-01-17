@@ -87,11 +87,19 @@ extern int (*acpi_suspend_lowlevel)(void);
 extern int arm_cpu_to_apicid[NR_CPUS];
 #define cpu_physical_id(cpu) arm_cpu_to_apicid[cpu]
 
+extern const char *acpi_get_enable_method(int cpu);
+
 #else	/* !CONFIG_ACPI */
 #define acpi_disabled 1		/* ACPI sometimes enabled on ARM */
 #define acpi_noirq 1		/* ACPI sometimes enabled on ARM */
 #define acpi_pci_disabled 1	/* ACPI PCI sometimes enabled on ARM */
 #define acpi_strict 1		/* no ACPI spec workarounds on ARM */
+
+static inline const char *acpi_get_enable_method(int cpu)
+{
+	return NULL;
+}
+
 #endif
 
 #endif /*_ASM_ARM64_ACPI_H*/

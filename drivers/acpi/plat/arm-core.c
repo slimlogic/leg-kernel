@@ -367,6 +367,32 @@ static void __init acpi_process_madt(void)
 }
 
 /*
+ * To see PCSI is enabled or not.
+ *
+ * PSCI is not available for ACPI 5.0, return FALSE for now.
+ *
+ * FIXME: should we introduce early_param("psci", func) for test purpose?
+ */
+static bool acpi_psci_smp_available(int cpu)
+{
+	return FALSE;
+}
+
+static const char *enable_method[] = {
+	"psci",
+	"spin-table",
+	NULL
+};
+
+const char *acpi_get_enable_method(int cpu)
+{
+	if (acpi_psci_smp_available(cpu))
+		return enable_method[0];
+	else
+		return enable_method[1];
+}
+
+/*
  * acpi_boot_table_init() and acpi_boot_init()
  *  called from setup_arch(), always.
  *	1. checksums all tables

@@ -39,7 +39,7 @@ extern void show_ipi_list(struct seq_file *p, int prec);
 extern void handle_IPI(int ipinr, struct pt_regs *regs);
 
 /*
- * Setup the set of possible CPUs (via set_cpu_possible)
+ * Platform specific SMP operations
  */
 extern void smp_init_cpus(void);
 
