@@ -83,6 +83,9 @@ void arch_fix_phys_package_id(int num, u32 slot);
 extern int (*acpi_suspend_lowlevel)(void);
 #define acpi_wakeup_address (0)
 
+#define MAX_GIC_CPU_INTERFACE 256
+#define MAX_GIC_DISTRIBUTOR   1		/* should be the same as MAX_GIC_NR */
+
 #else	/* !CONFIG_ACPI */
 #define acpi_disabled 1		/* ACPI sometimes enabled on ARM */
 #define acpi_noirq 1		/* ACPI sometimes enabled on ARM */

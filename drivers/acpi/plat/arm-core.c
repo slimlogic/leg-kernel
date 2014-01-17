@@ -46,6 +46,16 @@ EXPORT_SYMBOL(acpi_disabled);
 int acpi_pci_disabled;		/* skip ACPI PCI scan and IRQ initialization */
 EXPORT_SYMBOL(acpi_pci_disabled);
 
+/*
+ * Local interrupt controller address,
+ * GIC cpu interface base address on ARM/ARM64
+ */
+static u64 acpi_lapic_addr __initdata;
+
+#define BAD_MADT_ENTRY(entry, end) (					\
+	(!entry) || (unsigned long)entry + sizeof(*entry) > end ||	\
+	((struct acpi_subtable_header *)entry)->length < sizeof(*entry))
+
 #define PREFIX			"ACPI: "
 
 /* FIXME: this function should be moved to topology.c when it is ready */
@@ -90,6 +100,115 @@ void __init __acpi_unmap_table(char *map, unsigned long size)
 
 	/* should be early_iounmap(map, size); */
 	return;
+}
+
+static int __init acpi_parse_madt(struct acpi_table_header *table)
+{
+	struct acpi_table_madt *madt = NULL;
+
+	madt = (struct acpi_table_madt *)table;
+	if (!madt) {
+		pr_warn(PREFIX "Unable to map MADT\n");
+		return -ENODEV;
+	}
+
+	if (madt->address) {
+		acpi_lapic_addr = (u64) madt->address;
+
+		pr_info(PREFIX "Local APIC address 0x%08x\n", madt->address);
+	}
+
+	return 0;
+}
+
+/*
+ * GIC structures on ARM are somthing like Local APIC structures on x86,
+ * which means GIC cpu interfaces for GICv2/v3. Every GIC structure in
+ * MADT table represents a cpu in the system.
+ *
+ * GIC distributor structures are somthing like IOAPIC on x86. GIC can
+ * be initialized with information in this structure.
+ *
+ * Please refer to chapter5.2.12.14/15 of ACPI 5.0
+ */
+
+static int __init
+acpi_parse_gic(struct acpi_subtable_header *header, const unsigned long end)
+{
+	struct acpi_madt_generic_interrupt *processor = NULL;
+
+	processor = (struct acpi_madt_generic_interrupt *)header;
+
+	if (BAD_MADT_ENTRY(processor, end))
+		return -EINVAL;
+
+	acpi_table_print_madt_entry(header);
+
+	return 0;
+}
+
+static int __init
+acpi_parse_gic_distributor(struct acpi_subtable_header *header,
+				const unsigned long end)
+{
+	struct acpi_madt_generic_distributor *distributor = NULL;
+
+	distributor = (struct acpi_madt_generic_distributor *)header;
+
+	if (BAD_MADT_ENTRY(distributor, end))
+		return -EINVAL;
+
+	acpi_table_print_madt_entry(header);
+
+	return 0;
+}
+
+/*
+ * Parse GIC cpu interface related entries in MADT
+ * returns 0 on success, < 0 on error
+ */
+static int __init acpi_parse_madt_gic_entries(void)
+{
+	int count;
+
+	/*
+	 * do a partial walk of MADT to determine how many CPUs
+	 * we have including disabled CPUs
+	 */
+	count = acpi_table_parse_madt(ACPI_MADT_TYPE_GENERIC_INTERRUPT,
+				acpi_parse_gic, MAX_GIC_CPU_INTERFACE);
+
+	if (!count) {
+		pr_err(PREFIX "No GIC entries present\n");
+		return -ENODEV;
+	} else if (count < 0) {
+		pr_err(PREFIX "Error parsing GIC entry\n");
+		return count;
+	}
+
+	return 0;
+}
+
+/*
+ * Parse GIC distributor related entries in MADT
+ * returns 0 on success, < 0 on error
+ */
+static int __init acpi_parse_madt_gic_distributor_entries(void)
+{
+	int count;
+
+	count = acpi_table_parse_madt(ACPI_MADT_TYPE_GENERIC_DISTRIBUTOR,
+			acpi_parse_gic_distributor, MAX_GIC_DISTRIBUTOR);
+
+	if (!count) {
+		pr_err(PREFIX "No GIC distributor entries present\n");
+		return -ENODEV;
+	} else if (count < 0) {
+		pr_err(PREFIX "Error parsing GIC distributor entry\n");
+		return count;
+	}
+
+	return 0;
 }
 
 int acpi_gsi_to_irq(u32 gsi, unsigned int *irq)
@@ -141,11 +260,29 @@ static int __init acpi_parse_fadt(struct acpi_table_header *table)
 
 static void __init early_acpi_process_madt(void)
 {
-	return;
+	acpi_table_parse(ACPI_SIG_MADT, acpi_parse_madt);
 }
 
 static void __init acpi_process_madt(void)
 {
+	int error;
+
+	if (!acpi_table_parse(ACPI_SIG_MADT, acpi_parse_madt)) {
+
+		/*
+		 * Parse MADT GIC cpu interface entries
+		 */
+		error = acpi_parse_madt_gic_entries();
+		if (!error) {
+			/*
+			 * Parse MADT GIC distributor entries
+			 */
+			acpi_parse_madt_gic_distributor_entries();
+		}
+	}
+
+	pr_info("Using ACPI for processor (GIC) configuration information\n");
+
 	return;
 }
 
