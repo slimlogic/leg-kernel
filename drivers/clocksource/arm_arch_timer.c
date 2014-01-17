@@ -738,6 +738,7 @@ void __init arch_timer_acpi_init(struct acpi_table_header *table)
 	arch_timers_present |= ARCH_CP15_TIMER;
 	arch_timer_init();
 }
+CLOCKSOURCE_ACPI_DECLARE(armv8_arch_timer, "GTDT", arch_timer_acpi_init);
 #endif
 
 static void __init arch_timer_mem_init(struct device_node *np)
