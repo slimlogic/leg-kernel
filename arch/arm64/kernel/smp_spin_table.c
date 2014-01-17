@@ -25,6 +25,7 @@
 #include <asm/cpu_ops.h>
 #include <asm/cputype.h>
 #include <asm/smp_plat.h>
+#include <asm/acpi.h>
 
 extern void secondary_holding_pen(void);
 volatile unsigned long secondary_holding_pen_release = INVALID_HWID;
@@ -47,7 +48,6 @@ static void write_pen_release(u64 val)
 	__flush_dcache_area(start, size);
 }
 
-
 static int smp_spin_table_cpu_init(struct device_node *dn, unsigned int cpu)
 {
 	/*
@@ -55,10 +55,14 @@ static int smp_spin_table_cpu_init(struct device_node *dn, unsigned int cpu)
 	 */
 	if (of_property_read_u64(dn, "cpu-release-addr",
 				 &cpu_release_addr[cpu])) {
-		pr_err("CPU %d: missing or invalid cpu-release-addr property\n",
-		       cpu);
 
-		return -1;
+		/* try ACPI way */
+		if (acpi_get_cpu_release_address(cpu, &cpu_release_addr[cpu])) {
+			pr_err("CPU %d: missing or invalid cpu-release-addr property\n",
+				cpu);
+
+			return -1;
+		}
 	}
 
 	return 0;

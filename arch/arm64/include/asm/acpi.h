@@ -89,6 +89,8 @@ extern int arm_cpu_to_apicid[NR_CPUS];
 
 extern const char *acpi_get_enable_method(int cpu);
 
+extern int acpi_get_cpu_release_address(int cpu, u64 *release_address);
+
 #else	/* !CONFIG_ACPI */
 #define acpi_disabled 1		/* ACPI sometimes enabled on ARM */
 #define acpi_noirq 1		/* ACPI sometimes enabled on ARM */
@@ -98,6 +100,11 @@ extern const char *acpi_get_enable_method(int cpu);
 static inline const char *acpi_get_enable_method(int cpu)
 {
 	return NULL;
+}
+
+static inline int acpi_get_cpu_release_address(int cpu, u64 *release_address)
+{
+	return -ENODEV;
 }
 
 #endif

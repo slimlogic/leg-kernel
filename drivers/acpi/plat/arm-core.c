@@ -60,6 +60,9 @@ static int available_cpus;
 int arm_cpu_to_apicid[NR_CPUS] = { [0 ... NR_CPUS-1] = -1 };
 static int boot_cpu_apic_id = -1;
 
+/* Parked Address in ACPI GIC structure */
+static u64 parked_address[NR_CPUS];
+
 #define BAD_MADT_ENTRY(entry, end) (					\
 	(!entry) || (unsigned long)entry + sizeof(*entry) > end ||	\
 	((struct acpi_subtable_header *)entry)->length < sizeof(*entry))
@@ -193,6 +196,7 @@ static int __init
 acpi_parse_gic(struct acpi_subtable_header *header, const unsigned long end)
 {
 	struct acpi_madt_generic_interrupt *processor = NULL;
+	int cpu;
 
 	processor = (struct acpi_madt_generic_interrupt *)header;
 
@@ -208,8 +212,15 @@ acpi_parse_gic(struct acpi_subtable_header *header, const unsigned long end)
 	 * to not preallocating memory for all NR_CPUS
 	 * when we use CPU hotplug.
 	 */
-	acpi_register_gic_cpu_interface(processor->gic_id,
+	cpu = acpi_register_gic_cpu_interface(processor->gic_id,
 			processor->flags & ACPI_MADT_ENABLED);
+
+	/*
+	 * We need the parked address for SMP initialization with
+	 * spin-table enable method
+	 */
+	if (cpu >= 0 && processor->parked_address)
+		parked_address[cpu] = processor->parked_address;
 
 	return 0;
 }
@@ -265,6 +276,17 @@ static int __init acpi_parse_madt_gic_entries(void)
 	/* Make boot-up look pretty */
 	pr_info("%d CPUs available, %d CPUs total\n", available_cpus,
 		total_cpus);
+
+	return 0;
+}
+
+/* Parked Address in ACPI GIC structure can be used as cpu release addr */
+int acpi_get_cpu_release_address(int cpu, u64 *release_address)
+{
+	if (!release_address || !parked_address[cpu])
+		return -EINVAL;
+
+	*release_address = parked_address[cpu];
 
 	return 0;
 }
