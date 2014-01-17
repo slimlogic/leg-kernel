@@ -1014,3 +1014,20 @@ EXPORT_SYMBOL(acpi_unregister_ioapic);
  * TBD when when IA64 starts to support suspend...
  */
 int acpi_suspend_lowlevel(void) { return 0; }
+
+void arch_acpi_set_pdc_bits(u32 *buf)
+{
+	/* Enable coordination with firmware's _TSD info */
+	buf[2] |= ACPI_PDC_SMP_T_SWCOORD;
+	if (boot_option_idle_override == IDLE_NOMWAIT) {
+		/*
+		 * If mwait is disabled for CPU C-states, the C2C3_FFH access
+		 * mode will be disabled in the parameter of _PDC object.
+		 * Of course C1_FFH access mode will also be disabled.
+		 */
+		buf[2] &= ~(ACPI_PDC_C_C2C3_FFH | ACPI_PDC_C_C1_FFH);
+
+	}
+
+	buf[2] |= ACPI_PDC_EST_CAPABILITY_SMP;
+}
