@@ -220,6 +220,14 @@ void cpu_idle(void);
 
 void cpu_idle_poll_ctrl(bool enable);
 
+enum idle_boot_override {
+	IDLE_NO_OVERRIDE = 0,
+	IDLE_HALT,
+	IDLE_NOMWAIT,
+	IDLE_POLL,
+	IDLE_POWERSAVE_OFF
+};
+
 void arch_cpu_idle(void);
 void arch_cpu_idle_prepare(void);
 void arch_cpu_idle_enter(void);
