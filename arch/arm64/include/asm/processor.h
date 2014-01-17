@@ -162,6 +162,8 @@ static inline void spin_lock_prefetch(const void *x)
 
 #define HAVE_ARCH_PICK_MMAP_LAYOUT
 
+extern unsigned long    boot_option_idle_override;
+
 #endif
 
 #endif /* __ASM_PROCESSOR_H */
