@@ -1046,7 +1046,8 @@ acpi_os_read_pci_configuration(struct acpi_pci_id * pci_id, u32 reg,
 	result = raw_pci_read(pci_id->segment, pci_id->bus,
 				PCI_DEVFN(pci_id->device, pci_id->function),
 				reg, size, &value32);
-	*value = value32;
+	if (!result)
+		*value = value32;
 
 	return (result ? AE_ERROR : AE_OK);
 }
