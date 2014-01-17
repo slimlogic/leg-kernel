@@ -48,6 +48,7 @@
 #include <asm/sections.h>
 #include <asm/tlbflush.h>
 #include <asm/ptrace.h>
+#include <asm/acpi.h>
 
 /*
  * as from 2.5, kernels no longer have an init_tasks structure
@@ -282,7 +283,7 @@ static void (*smp_cross_call)(const struct cpumask *, unsigned int);
  * cpu logical map array containing MPIDR values related to logical
  * cpus. Assumes that cpu_logical_map(0) has already been initialized.
  */
-void __init smp_init_cpus(void)
+static int __init of_smp_init_cpus(void)
 {
 	struct device_node *dn = NULL;
 	unsigned int i, cpu = 1;
@@ -366,6 +367,10 @@ next:
 		cpu++;
 	}
 
+	/* No device tree or no CPU node in DT */
+	if (cpu == 1 && !bootcpu_valid)
+		return -ENODEV;
+
 	/* sanity check */
 	if (cpu > NR_CPUS)
 		pr_warning("no. of cores (%d) greater than configured maximum of %d - clipping\n",
@@ -373,7 +378,7 @@ next:
 
 	if (!bootcpu_valid) {
 		pr_err("DT missing boot CPU MPIDR, not enabling secondaries\n");
-		return;
+		return -EINVAL;
 	}
 
 	/*
@@ -383,6 +388,39 @@ next:
 	for (i = 0; i < NR_CPUS; i++)
 		if (cpu_logical_map(i) != INVALID_HWID)
 			set_cpu_possible(i, true);
+
+	return 0;
+}
+
+/*
+ * In ACPI mode, the cpu possible map was enumerated before SMP
+ * initialization when MADT table was parsed, so we can get the
+ * possible map here to initialize CPUs.
+ */
+static void __init acpi_smp_init_cpus(void)
+{
+	int cpu;
+	const char *enable_method;
+
+	for_each_possible_cpu(cpu) {
+		enable_method = acpi_get_enable_method(cpu);
+		if (!enable_method)
+			continue;
+
+		cpu_ops[cpu] = cpu_get_ops(enable_method);
+		if (!cpu_ops[cpu])
+			continue;
+
+		cpu_ops[cpu]->cpu_init(NULL, cpu);
+	}
+}
+
+void __init smp_init_cpus(void)
+{
+	if (!of_smp_init_cpus())
+		return;
+
+	acpi_smp_init_cpus();
 }
 
 void __init smp_prepare_cpus(unsigned int max_cpus)
