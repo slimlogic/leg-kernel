@@ -76,15 +76,16 @@ static inline void acpi_disable_pci(void)
 /* FIXME: this function should be moved to topology.h when it's ready */
 void arch_fix_phys_package_id(int num, u32 slot);
 
-/* temperally define -1 to make acpi core compilerable */
-#define cpu_physical_id(cpu) -1
-
 /* Low-level suspend routine. */
 extern int (*acpi_suspend_lowlevel)(void);
 #define acpi_wakeup_address (0)
 
 #define MAX_GIC_CPU_INTERFACE 256
 #define MAX_GIC_DISTRIBUTOR   1		/* should be the same as MAX_GIC_NR */
+
+/* map logic cpu id to physical GIC id */
+extern int arm_cpu_to_apicid[NR_CPUS];
+#define cpu_physical_id(cpu) arm_cpu_to_apicid[cpu]
 
 #else	/* !CONFIG_ACPI */
 #define acpi_disabled 1		/* ACPI sometimes enabled on ARM */
