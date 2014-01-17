@@ -42,6 +42,7 @@
 #include <linux/of_fdt.h>
 #include <linux/of_platform.h>
 #include <linux/efi.h>
+#include <linux/acpi.h>
 
 #include <asm/fixmap.h>
 #include <asm/cputype.h>
@@ -337,6 +338,11 @@ void __init setup_arch(char **cmdline_p)
 
 	efi_init();
 	arm64_memblock_init();
+
+	/* Parse the ACPI tables for possible boot-time configuration */
+	acpi_boot_table_init();
+	early_acpi_boot_init();
+	acpi_boot_init();
 
 	paging_init();
 	request_standard_resources();
