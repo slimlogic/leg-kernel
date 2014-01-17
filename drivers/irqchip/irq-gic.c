@@ -963,6 +963,13 @@ void __init gic_init_bases(unsigned int gic_nr, int irq_start,
 		register_cpu_notifier(&gic_cpu_notifier);
 #endif
 		set_handle_irq(gic_handle_irq);
+
+		/*
+		 * do not set default host for GIC domain multi-times.
+		 * FIXME: This probably needs revisited when multi GICs
+		 * supported
+		 */
+		irq_set_default_host(gic->domain);
 	}
 
 	gic_chip.flags |= gic_arch_extn.flags;
