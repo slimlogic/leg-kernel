@@ -67,6 +67,12 @@ void __init time_init(void)
 
 	clocksource_of_init();
 
+	/*
+	 * Since ACPI or FDT will only one be available in the system,
+	 * we can use clocksource_acpi_init() here safely
+	 */
+	clocksource_acpi_init();
+
 	arch_timer_rate = arch_timer_get_rate();
 	if (!arch_timer_rate)
 		panic("Unable to initialise architected timer.\n");
