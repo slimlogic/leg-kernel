@@ -361,12 +361,15 @@ static inline void clocksource_of_init(void) {}
 #endif
 
 #ifdef CONFIG_ACPI
+extern void clocksource_acpi_init(void);
+
 #define CLOCKSOURCE_ACPI_DECLARE(name, compat, fn)			\
 	static const struct acpi_device_id __clksrc_acpi_table_##name	\
 		__used __section(__clksrc_acpi_table)			\
 		 = { .id = compat,				\
 		     .driver_data = (kernel_ulong_t)fn }
 #else
+static inline void clocksource_acpi_init(void) { return; }
 #define CLOCKSOURCE_ACPI_DECLARE(name, compat, fn)
 #endif
 
