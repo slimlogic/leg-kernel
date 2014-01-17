@@ -1,1 +1,1 @@
-obj-$(CONFIG_ARM64)	+= arm-core.o
+obj-$(CONFIG_ACPI_ARM)	+= arm-core.o
