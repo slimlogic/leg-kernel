@@ -31,6 +31,7 @@
 #include <linux/smp.h>
 
 #include <asm/pgtable.h>
+#include <asm/cputype.h>
 
 /*
  * We never plan to use RSDT on arm/arm64 as its deprecated in spec but this
@@ -51,6 +52,13 @@ EXPORT_SYMBOL(acpi_pci_disabled);
  * GIC cpu interface base address on ARM/ARM64
  */
 static u64 acpi_lapic_addr __initdata;
+
+/* available_cpus here means enabled cpu in MADT */
+static int available_cpus;
+
+/* Map logic cpu id to physical GIC id (physical CPU id). */
+int arm_cpu_to_apicid[NR_CPUS] = { [0 ... NR_CPUS-1] = -1 };
+static int boot_cpu_apic_id = -1;
 
 #define BAD_MADT_ENTRY(entry, end) (					\
 	(!entry) || (unsigned long)entry + sizeof(*entry) > end ||	\
@@ -132,6 +140,55 @@ static int __init acpi_parse_madt(struct acpi_table_header *table)
  * Please refer to chapter5.2.12.14/15 of ACPI 5.0
  */
 
+/**
+ * acpi_register_gic_cpu_interface - register a gic cpu interface and
+ * generates a logic cpu number
+ * @id: gic cpu interface id to register
+ * @enabled: this cpu is enabled or not
+ *
+ * Returns the logic cpu number which maps to the gic cpu interface
+ */
+static int acpi_register_gic_cpu_interface(int id, u8 enabled)
+{
+	int cpu;
+
+	if (id >= MAX_GIC_CPU_INTERFACE) {
+		pr_info(PREFIX "skipped apicid that is too big\n");
+		return -EINVAL;
+	}
+
+	total_cpus++;
+	if (!enabled)
+		return -EINVAL;
+
+	if (available_cpus >=  NR_CPUS) {
+		pr_warn(PREFIX "NR_CPUS limit of %d reached,"
+		" Processor %d/0x%x ignored.\n", NR_CPUS, total_cpus, id);
+		return -EINVAL;
+	}
+
+	available_cpus++;
+
+	/* allocate a logic cpu id for the new comer */
+	if (boot_cpu_apic_id == id) {
+		/*
+		 * boot_cpu_init() already hold bit 0 in cpu_present_mask
+		 * for BSP, no need to allocte again.
+		 */
+		cpu = 0;
+	} else {
+		cpu = cpumask_next_zero(-1, cpu_present_mask);
+	}
+
+	/* map the logic cpu id to APIC id */
+	arm_cpu_to_apicid[cpu] = id;
+
+	set_cpu_present(cpu, true);
+	set_cpu_possible(cpu, true);
+
+	return cpu;
+}
+
 static int __init
 acpi_parse_gic(struct acpi_subtable_header *header, const unsigned long end)
 {
@@ -143,6 +200,16 @@ acpi_parse_gic(struct acpi_subtable_header *header, const unsigned long end)
 		return -EINVAL;
 
 	acpi_table_print_madt_entry(header);
+
+	/*
+	 * We need to register disabled CPU as well to permit
+	 * counting disabled CPUs. This allows us to size
+	 * cpus_possible_map more accurately, to permit
+	 * to not preallocating memory for all NR_CPUS
+	 * when we use CPU hotplug.
+	 */
+	acpi_register_gic_cpu_interface(processor->gic_id,
+			processor->flags & ACPI_MADT_ENABLED);
 
 	return 0;
 }
@@ -185,6 +252,19 @@ static int __init acpi_parse_madt_gic_entries(void)
 		pr_err(PREFIX "Error parsing GIC entry\n");
 		return count;
 	}
+
+#ifdef CONFIG_SMP
+	if (available_cpus == 0) {
+		pr_info(PREFIX "Found 0 CPUs; assuming 1\n");
+		arm_cpu_to_apicid[available_cpus] =
+			read_cpuid_mpidr() & MPIDR_HWID_BITMASK;
+		available_cpus = 1;	/* We've got at least one of these */
+	}
+#endif
+
+	/* Make boot-up look pretty */
+	pr_info("%d CPUs available, %d CPUs total\n", available_cpus,
+		total_cpus);
 
 	return 0;
 }
@@ -320,6 +400,9 @@ int __init early_acpi_boot_init(void)
 	 */
 	if (acpi_disabled)
 		return -ENODEV;
+
+	/* Get the boot CPU's GIC cpu interface id before MADT parsing */
+	boot_cpu_apic_id = read_cpuid_mpidr() & MPIDR_HWID_BITMASK;
 
 	/*
 	 * Process the Multiple APIC Description Table (MADT), if present
