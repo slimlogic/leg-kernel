@@ -11,6 +11,7 @@
  */
 
 static efi_status_t update_fdt(efi_system_table_t *sys_table, void *orig_fdt,
+			       unsigned long orig_fdt_size,
 			       void *fdt, int new_fdt_size, char *cmdline_ptr,
 			       u64 initrd_addr, u64 initrd_size,
 			       efi_memory_desc_t *memory_map,
@@ -32,7 +33,27 @@ static efi_status_t update_fdt(efi_system_table_t *sys_table, void *orig_fdt,
 	    "Linux version " UTS_RELEASE " (" LINUX_COMPILE_BY "@"
 	    LINUX_COMPILE_HOST ") (" LINUX_COMPILER ") " UTS_VERSION "\n";
 
-	status = fdt_open_into(orig_fdt, fdt, new_fdt_size);
+	/* Do some checks on provided FDT, if it exists*/
+	if (orig_fdt) {
+		if (fdt_check_header(orig_fdt)) {
+			pr_efi_err(sys_table, "Device Tree header not valid!\n");
+			return EFI_LOAD_ERROR;
+		}
+		/*
+		 * We don't get the size of the FDT if we get if from a
+		 * configuration table.
+		 */
+		if (orig_fdt_size && fdt_totalsize(orig_fdt) > orig_fdt_size) {
+			pr_efi_err(sys_table, "Truncated device tree! foo!\n");
+			return EFI_LOAD_ERROR;
+		}
+	}
+
+	if (orig_fdt)
+		status = fdt_open_into(orig_fdt, fdt, new_fdt_size);
+	else
+		status = fdt_create_empty_tree(fdt, new_fdt_size);
+
 	if (status != 0)
 		goto fdt_set_fail;
 
@@ -180,10 +201,10 @@ efi_status_t allocate_new_fdt_and_exit_boot(efi_system_table_t *sys_table,
 			goto fail_free_new_fdt;
 
 		status = update_fdt(sys_table,
-				    (void *)fdt_addr, (void *)*new_fdt_addr,
-				    new_fdt_size, cmdline_ptr, initrd_addr,
-				    initrd_size, memory_map, map_size,
-				    desc_size, desc_ver);
+				    (void *)fdt_addr, fdt_size,
+				    (void *)*new_fdt_addr, new_fdt_size,
+				    cmdline_ptr, initrd_addr, initrd_size,
+				    memory_map, map_size, desc_size, desc_ver);
 
 		/* Succeeding the first time is the expected case. */
 		if (status == EFI_SUCCESS)
