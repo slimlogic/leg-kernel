@@ -102,11 +102,7 @@ char *__init __acpi_map_table(unsigned long phys, unsigned long size)
 	if (!phys || !size)
 		return NULL;
 
-	/*
-	 * temporarily use phys_to_virt(),
-	 * should be early_memremap(phys, size) here
-	 */
-	return phys_to_virt(phys);
+	return early_memremap(phys, size);
 }
 
 void __init __acpi_unmap_table(char *map, unsigned long size)
@@ -114,7 +110,7 @@ void __init __acpi_unmap_table(char *map, unsigned long size)
 	if (!map || !size)
 		return;
 
-	/* should be early_iounmap(map, size); */
+	early_iounmap(map, size);
 	return;
 }
 
@@ -298,7 +294,7 @@ acpi_parse_gic_distributor(struct acpi_subtable_header *header,
 static int __init acpi_parse_madt_gic_entries(void)
 {
 	int count;
- 
+
 	/*
 	 * do a partial walk of MADT to determine how many CPUs
 	 * we have including disabled CPUs
