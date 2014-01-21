@@ -208,6 +208,18 @@ struct gufi_device_node *gufi_look_for_node(struct device_node *dn,
 	if ((ga || gd ) && (ga == gd))
 		return ga ? ga : gd;
 
+	if (ga && !gd) {
+		if (dn)
+			ga->dn = dn;
+		return ga;
+	}
+
+	if (gd && !ga) {
+		if (an)
+			gd->an = an;
+		return gd;
+	}
+
 	if (!(ga || gd)) {
 		gdn = kzalloc(sizeof(struct gufi_device_node), GFP_KERNEL);
 		if (gdn) {
