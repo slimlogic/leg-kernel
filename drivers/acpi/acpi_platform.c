@@ -37,6 +37,24 @@ static const struct acpi_device_id acpi_platform_device_ids[] = {
 	{ "INT33C8" },
 	{ "80860F28" },
 
+	/* arm64 platform devices */
+	{ "LNRO0003" }, /* smc91x for ethernet */
+	{ "LNRO0005" }, /* virtio mmio */
+	{ "LNRO0007" }, /* armv8 pmu */
+	{ "LNRO0008" }, /* Fixed clock */
+	{ "LNRO0009" }, /* vexpress-sysreg */
+	{ "LNRO000A" }, /* uart-pl011 */
+	{ "LNRO000F" }, /* kmi0,kmi1 */
+	{ "LNRO0011" }, /* wdt */
+	{ "LNRO0013" }, /* rtc */
+	{ "LNRO0016" }, /* flash jedec_probe */
+	{ "LNRO0015" }, /* flash cfi_probe */
+	{ "LNRO0017" }, /* flash map_ram */
+	{ "LNRO0018" }, /* flash direct-mapped */
+	{ "LNRO0019" }, /* fixed regulator */
+
+	{ "AMBA0000" },
+
 	{ }
 };
 
