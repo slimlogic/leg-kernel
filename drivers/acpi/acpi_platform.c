@@ -55,6 +55,10 @@ static const struct acpi_device_id acpi_platform_device_ids[] = {
 
 	{ "AMBA0000" },
 
+	/* minnowboard devices */
+	{ "MNW0002" },	/* experimental */
+	{ "MNW0003" },	/* experimental */
+
 	{ }
 };
 
