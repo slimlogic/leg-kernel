@@ -79,4 +79,16 @@ struct gufi_device_node *gufi_acpi_find_first_node(const char *name)
 	return node;
 }
 
+struct gufi_device_node *gufi_acpi_node_get(struct gufi_device_node *gdn)
+{
+	/* ACPI doesn't really do reference counting */
+	return gdn;
+}
+
+void gufi_acpi_node_put(struct gufi_device_node *gdn)
+{
+	/* ACPI doesn't really do reference counting */
+	return;
+}
+
 #endif	/* CONFIG_GUFI */

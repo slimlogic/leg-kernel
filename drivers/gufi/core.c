@@ -263,14 +263,55 @@ struct gufi_device_node *gufi_find_first_node(const char *name)
 }
 EXPORT_SYMBOL(gufi_find_first_node);
 
+struct gufi_device_node *gufi_node_get(struct gufi_device_node *gdn)
+{
+	struct gufi_device_node *result = NULL;
+	struct gufi_protocol *p;
+
+	list_for_each_entry(p, &__protocols, entry) {
+		if (p->node_get)
+			result = p->node_get(gdn);
+	}
+	kref_get(&gdn->kref);
+
+	return result;
+}
+EXPORT_SYMBOL(gufi_node_get);
+
+static void gufi_node_release(struct kref *kref)
+{
+	struct gufi_device_node *gdn;
+
+	gdn = container_of(kref, struct gufi_device_node, kref);
+	kfree(gdn);
+}
+
+void gufi_node_put(struct gufi_device_node *gdn)
+{
+	struct gufi_protocol *p;
+
+	list_for_each_entry(p, &__protocols, entry) {
+		if (p->node_put)
+			p->node_put(gdn);
+	}
+	kref_put(&gdn->kref, gufi_node_release);
+
+	return;
+}
+EXPORT_SYMBOL(gufi_node_put);
+
 static struct gufi_protocol acpi_protocol = {
 	.name = "ACPI",
 	.find_first_node = gufi_acpi_find_first_node,
+	.node_get = gufi_acpi_node_get,
+	.node_put = gufi_acpi_node_put,
 };
 
 static struct gufi_protocol of_protocol = {
 	.name = "OF",
 	.find_first_node = gufi_of_find_first_node,
+	.node_get = gufi_of_node_get,
+	.node_put = gufi_of_node_put,
 };
 
 int __init gufi_init(void)
