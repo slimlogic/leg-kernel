@@ -119,10 +119,13 @@ void __iomem *vexpress_get_24mhz_clock_base(void)
 static void vexpress_sysreg_find_prop(struct device_node *node,
 		const char *name, u32 *val)
 {
-	of_node_get(node);
+	struct gufi_device_node *gdn;
+
+	gdn = gufi_look_for_node(node, NULL);
+	gufi_node_get(gdn);
 	while (node) {
 		if (of_property_read_u32(node, name, val) == 0) {
-			of_node_put(node);
+			gufi_node_put(gdn);
 			return;
 		}
 		node = of_get_next_parent(node);
@@ -169,6 +172,7 @@ static int vexpress_sysreg_config_tries;
 static void *vexpress_sysreg_config_func_get(struct device *dev,
 		struct device_node *node)
 {
+	struct gufi_device_node *gdn;
 	struct vexpress_sysreg_config_func *config_func;
 	u32 site;
 	u32 position = 0;
@@ -177,7 +181,8 @@ static void *vexpress_sysreg_config_func_get(struct device *dev,
 	int err = -EFAULT;
 
 	if (node) {
-		of_node_get(node);
+		gdn = gufi_look_for_node(node, NULL);
+		gufi_node_get(gdn);
 		vexpress_sysreg_find_prop(node, "arm,vexpress,site", &site);
 		vexpress_sysreg_find_prop(node, "arm,vexpress,position",
 				&position);
@@ -185,7 +190,7 @@ static void *vexpress_sysreg_config_func_get(struct device *dev,
 		err = of_property_read_u32_array(node,
 				"arm,vexpress-sysreg,func", func_device,
 				ARRAY_SIZE(func_device));
-		of_node_put(node);
+		gufi_node_put(gdn);
 	} else if (dev && dev->bus == &platform_bus_type) {
 		struct platform_device *pdev = to_platform_device(dev);
 
