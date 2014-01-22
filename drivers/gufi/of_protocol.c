@@ -41,4 +41,20 @@ struct gufi_device_node *gufi_of_find_first_node(const char *name)
 	return gdn;
 }
 
+struct gufi_device_node *gufi_of_node_get(struct gufi_device_node *gdn)
+{
+	if (gdn)
+		if (gdn->dn)
+			of_node_get(gdn->dn);
+
+	return gdn;
+}
+
+void gufi_of_node_put(struct gufi_device_node *gdn)
+{
+	if (gdn)
+		if (gdn->dn)
+			of_node_put(gdn->dn);
+}
+
 #endif	/* CONFIG_GUFI */
