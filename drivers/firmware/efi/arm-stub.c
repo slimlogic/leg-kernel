@@ -87,8 +87,7 @@ unsigned long efi_entry(void *handle, efi_system_table_t *sys_table,
 	 * protocol. We are going to copy the command line into the
 	 * device tree, so this can be allocated anywhere.
 	 */
-	cmdline_ptr = efi_convert_cmdline_to_ascii(sys_table, image,
-						    &cmdline_size);
+	cmdline_ptr = efi_convert_cmdline(sys_table, image, &cmdline_size);
 	if (!cmdline_ptr) {
 		pr_efi_err(sys_table, "getting command line via LOADED_IMAGE_PROTOCOL\n");
 		goto fail_free_image;
