@@ -91,7 +91,7 @@ suffix_$(CONFIG_KERNEL_LZ4)  = lz4
 
 # Borrowed libfdt files for the ATAG compatibility mode
 
-libfdt		:= fdt_rw.c fdt_ro.c fdt_wip.c fdt.c
+libfdt		:= fdt_rw.c fdt_ro.c fdt_wip.c fdt.c fdt_empty_tree.c fdt_sw.c
 libfdt_hdrs	:= fdt.h libfdt.h libfdt_internal.h
 
 libfdt_objs	:= $(addsuffix .o, $(basename $(libfdt)))
@@ -99,11 +99,22 @@ libfdt_objs	:= $(addsuffix .o, $(basename $(libfdt)))
 $(addprefix $(obj)/,$(libfdt) $(libfdt_hdrs)): $(obj)/%: $(srctree)/scripts/dtc/libfdt/%
 	$(call cmd,shipped)
 
-$(addprefix $(obj)/,$(libfdt_objs) atags_to_fdt.o): \
+$(addprefix $(obj)/,$(libfdt_objs) atags_to_fdt.o efi-stub.o): \
 	$(addprefix $(obj)/,$(libfdt_hdrs))
 
 ifeq ($(CONFIG_ARM_ATAG_DTB_COMPAT),y)
-OBJS	+= $(libfdt_objs) atags_to_fdt.o
+OBJS	+= atags_to_fdt.o
+USE_LIBFDT = y
+endif
+
+ifeq ($(CONFIG_EFI_STUB),y)
+CFLAGS_efi-stub.o += -DTEXT_OFFSET=$(TEXT_OFFSET)
+OBJS	+= efi-stub.o
+USE_LIBFDT = y
+endif
+
+ifeq ($(USE_LIBFDT),y)
+OBJS	+= $(libfdt_objs)
 endif
 
 targets       := vmlinux vmlinux.lds \
