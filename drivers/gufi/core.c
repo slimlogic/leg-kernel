@@ -257,10 +257,11 @@ struct gufi_device_node *gufi_find_first_node(const char *name)
 	struct gufi_protocol *p;
 
 	list_for_each_entry(p, &__protocols, entry) {
-		if (p->find_first_node)
+		if (p->find_first_node) {
 			result = p->find_first_node(name);
 			if (result)
 				break;
+		}
 	}
 
 	return result;
