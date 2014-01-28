@@ -205,18 +205,22 @@ struct gufi_device_node *gufi_look_for_node(struct device_node *dn,
 	pr_debug("GUFI: gufi_look_for_node: ga = 0x%p\n", ga);
 	pr_debug("GUFI: gufi_look_for_node: gd = 0x%p\n", gd);
 
-	if ((ga || gd ) && (ga == gd))
-		return ga ? ga : gd;
+	if ((ga || gd) && (ga == gd)) {
+		spin_unlock_irqrestore(&__gdn_list_lock, lock_flags);
+		return ga; /* because ga == gd */
+	}
 
 	if (ga && !gd) {
 		if (dn)
 			ga->dn = dn;
+		spin_unlock_irqrestore(&__gdn_list_lock, lock_flags);
 		return ga;
 	}
 
 	if (gd && !ga) {
 		if (an)
 			gd->an = an;
+		spin_unlock_irqrestore(&__gdn_list_lock, lock_flags);
 		return gd;
 	}
 
