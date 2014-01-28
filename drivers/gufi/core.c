@@ -330,21 +330,17 @@ int __init gufi_init(void)
 	case SEARCH_ACPI_ONLY:
 		gufi_register_protocol(&acpi_protocol);
 		break;
-		;;
 	case SEARCH_DT_ONLY:
 		gufi_register_protocol(&of_protocol);
 		break;
-		;;
 	case SEARCH_ACPI_FIRST:
 		gufi_register_protocol(&acpi_protocol);
 		gufi_register_protocol(&of_protocol);
 		break;
-		;;
 	case SEARCH_DT_FIRST:
 		gufi_register_protocol(&of_protocol);
 		gufi_register_protocol(&acpi_protocol);
 		break;
-		;;
 	}
 
 	return 0;
