@@ -205,18 +205,22 @@ struct gufi_device_node *gufi_look_for_node(struct device_node *dn,
 	pr_debug("GUFI: gufi_look_for_node: ga = 0x%p\n", ga);
 	pr_debug("GUFI: gufi_look_for_node: gd = 0x%p\n", gd);
 
-	if ((ga || gd ) && (ga == gd))
-		return ga ? ga : gd;
+	if ((ga || gd) && (ga == gd)) {
+		spin_unlock_irqrestore(&__gdn_list_lock, lock_flags);
+		return ga; /* because ga == gd */
+	}
 
 	if (ga && !gd) {
 		if (dn)
 			ga->dn = dn;
+		spin_unlock_irqrestore(&__gdn_list_lock, lock_flags);
 		return ga;
 	}
 
 	if (gd && !ga) {
 		if (an)
 			gd->an = an;
+		spin_unlock_irqrestore(&__gdn_list_lock, lock_flags);
 		return gd;
 	}
 
@@ -253,10 +257,11 @@ struct gufi_device_node *gufi_find_first_node(const char *name)
 	struct gufi_protocol *p;
 
 	list_for_each_entry(p, &__protocols, entry) {
-		if (p->find_first_node)
+		if (p->find_first_node) {
 			result = p->find_first_node(name);
 			if (result)
 				break;
+		}
 	}
 
 	return result;
@@ -325,21 +330,17 @@ int __init gufi_init(void)
 	case SEARCH_ACPI_ONLY:
 		gufi_register_protocol(&acpi_protocol);
 		break;
-		;;
 	case SEARCH_DT_ONLY:
 		gufi_register_protocol(&of_protocol);
 		break;
-		;;
 	case SEARCH_ACPI_FIRST:
 		gufi_register_protocol(&acpi_protocol);
 		gufi_register_protocol(&of_protocol);
 		break;
-		;;
 	case SEARCH_DT_FIRST:
 		gufi_register_protocol(&of_protocol);
 		gufi_register_protocol(&acpi_protocol);
 		break;
-		;;
 	}
 
 	return 0;
