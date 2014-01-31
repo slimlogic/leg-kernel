@@ -95,16 +95,20 @@ unsigned long efi_entry(void *handle, efi_system_table_t *sys_table,
 
 	/* Load a device tree from the configuration table, if present. */
 	fdt_addr = (uintptr_t)get_fdt(sys_table);
-	if (!fdt_addr) {
-		status = handle_cmdline_files(sys_table, image, cmdline_ptr,
-					      "dtb=",
-					      ~0UL, (unsigned long *)&fdt_addr,
-					      (unsigned long *)&fdt_size);
 
-		if (status != EFI_SUCCESS) {
-			pr_efi_err(sys_table, "Failed to load device tree!\n");
-			goto fail_free_cmdline;
-		}
+	/*
+	 * Unauthenticated device tree data is a security hazard, so
+	 * ignore 'dtb=' unless UEFI Secure Boot is disabled.
+	 */
+	if (efi_secureboot_enabled(sys_table))
+		pr_efi(sys_table, "UEFI Secure Boot is enabled.\n");
+	else if (!fdt_addr)
+		handle_cmdline_files(sys_table, image, cmdline_ptr, "dtb=",
+				     ~0UL, (unsigned long *)&fdt_addr,
+				     (unsigned long *)&fdt_size);
+	if (!fdt_addr) {
+		pr_efi_err(sys_table, "Failed to load device tree!\n");
+		goto fail_free_cmdline;
 	}
 
 	status = handle_cmdline_files(sys_table, image, cmdline_ptr,
