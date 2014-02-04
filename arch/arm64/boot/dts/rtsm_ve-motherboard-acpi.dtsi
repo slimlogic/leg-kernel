@@ -35,6 +35,7 @@
 		#size-cells = <1>;
 		#interrupt-cells = <1>;
 		ranges;
+		arm,vexpress,site = <0xf>;
 
 		flash@0,00000000 {
 			compatible = "arm,vexpress-flash", "cfi-flash";
