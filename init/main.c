@@ -903,7 +903,8 @@ static noinline void __init kernel_init_freeable(void)
 
 	do_pre_smp_initcalls();
 
-	if (IS_ENABLED(CONFIG_ARM) && efi_enabled(EFI_BOOT))
+	if ((IS_ENABLED(CONFIG_ARM) || IS_ENABLED(CONFIG_ARM64)) &&
+	    efi_enabled(EFI_BOOT))
 		efi_enter_virtual_mode();
 
 	lockup_detector_init();
