@@ -33,6 +33,7 @@
 #include <linux/mtd/sharpsl.h>
 #include <linux/input/matrix_keypad.h>
 #include <linux/module.h>
+#include <linux/memblock.h>
 #include <video/w100fb.h>
 
 #include <asm/setup.h>
@@ -713,16 +714,13 @@ static void __init corgi_init(void)
 	platform_add_devices(devices, ARRAY_SIZE(devices));
 }
 
-static void __init fixup_corgi(struct tag *tags, char **cmdline,
-			       struct meminfo *mi)
+static void __init fixup_corgi(struct tag *tags, char **cmdline)
 {
 	sharpsl_save_param();
-	mi->nr_banks=1;
-	mi->bank[0].start = 0xa0000000;
 	if (machine_is_corgi())
-		mi->bank[0].size = (32*1024*1024);
+		memblock_add(0xa0000000, SZ_32M);
 	else
-		mi->bank[0].size = (64*1024*1024);
+		memblock_add(0xa0000000, SZ_64M);
 }
 
 #ifdef CONFIG_MACH_CORGI
