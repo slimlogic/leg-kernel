@@ -6,9 +6,9 @@ menu "Grand Unified Firmware Interface support"
 
 choice
 	prompt "Fetching configuration info"
-	default GUFI_ACPI_FIRST
+	default GUFI_ACPI
 
-config GUFI_ACPI_ONLY
+config GUFI_ACPI
 	bool "ONLY search ACPI tables"
 	depends on ACPI
 	help
@@ -16,28 +16,12 @@ config GUFI_ACPI_ONLY
 	  information in the ACPI tables and methods only, ignoring
 	  any Device Tree content.
 
-config GUFI_DT_ONLY
+config GUFI_DT
 	bool "ONLY search Device Tree"
 	depends on OF
 	help
 	  This option forces GUFI to search for device configuration
 	  information in the Device Tree only, ignoring any ACPI content.
-
-config GUFI_ACPI_FIRST
-	bool "Always search ACPI tables first"
-	depends on ACPI
-	help
-	  This option forces GUFI to search for device configuration
-	  information in the ACPI tables and methods first and should
-	  that fail, look in a Device Tree, if it is enabled.
-
-config GUFI_DT_FIRST
-	bool "Always search Device Tree first"
-	depends on OF
-	help
-	  This option forces GUFI to search for device configuration
-	  information in the Device Tree and should that fail, look in
-	  the ACPI tables and methods, if it is enabled.
 
 endchoice
 

@@ -42,22 +42,16 @@
  */
 
 enum search_preference {
-	SEARCH_ACPI_ONLY,
-	SEARCH_DT_ONLY,
-	SEARCH_ACPI_FIRST,
-	SEARCH_DT_FIRST
+	SEARCH_ACPI,
+	SEARCH_DT
 };
 
-#if IS_ENABLED(CONFIG_GUFI_ACPI_ONLY)
-#define DEFAULT_PREFERENCE	SEARCH_ACPI_ONLY
-#elif IS_ENABLED(CONFIG_GUFI_DT_ONLY)
-#define DEFAULT_PREFERENCE	SEARCH_DT_ONLY
-#elif IS_ENABLED(CONFIG_GUFI_ACPI_FIRST)
-#define DEFAULT_PREFERENCE	SEARCH_ACPI_FIRST
-#elif IS_ENABLED(CONFIG_GUFI_DT_FIRST)
-#define DEFAULT_PREFERENCE	SEARCH_DT_FIRST
+#if IS_ENABLED(CONFIG_GUFI_ACPI)
+# define DEFAULT_PREFERENCE	SEARCH_ACPI
+#elif IS_ENABLED(CONFIG_GUFI_DT)
+# define DEFAULT_PREFERENCE	SEARCH_DT
 #else
-#define DEFAULT_PREFERENCE	SEARCH_ACPI_FIRST
+# define DEFAULT_PREFERENCE	SEARCH_ACPI
 #endif
 
 static enum search_preference howto_search = DEFAULT_PREFERENCE;
@@ -327,20 +321,14 @@ int __init gufi_init(void)
 	 */
 
 	switch (howto_search) {
-	case SEARCH_ACPI_ONLY:
+	case SEARCH_ACPI:
 		gufi_register_protocol(&acpi_protocol);
 		break;
-	case SEARCH_DT_ONLY:
+	case SEARCH_DT:
 		gufi_register_protocol(&of_protocol);
 		break;
-	case SEARCH_ACPI_FIRST:
-		gufi_register_protocol(&acpi_protocol);
-		gufi_register_protocol(&of_protocol);
-		break;
-	case SEARCH_DT_FIRST:
-		gufi_register_protocol(&of_protocol);
-		gufi_register_protocol(&acpi_protocol);
-		break;
+	default:
+		BUG(0);
 	}
 
 	return 0;
