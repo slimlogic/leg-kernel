@@ -41,21 +41,6 @@
  *
  */
 
-enum search_preference {
-	SEARCH_ACPI,
-	SEARCH_DT
-};
-
-#if IS_ENABLED(CONFIG_GUFI_ACPI)
-# define DEFAULT_PREFERENCE	SEARCH_ACPI
-#elif IS_ENABLED(CONFIG_GUFI_DT)
-# define DEFAULT_PREFERENCE	SEARCH_DT
-#else
-# define DEFAULT_PREFERENCE	SEARCH_ACPI
-#endif
-
-static enum search_preference howto_search = DEFAULT_PREFERENCE;
-
 static LIST_HEAD(__protocols);
 static LIST_HEAD(__gdn_list);
 
@@ -315,21 +300,10 @@ static struct gufi_protocol of_protocol = {
 
 int __init gufi_init(void)
 {
-	/*
-	 * TODO: enable a kernel parameter that would allow
-	 * this to be switched at boot time.
-	 */
-
-	switch (howto_search) {
-	case SEARCH_ACPI:
-		gufi_register_protocol(&acpi_protocol);
-		break;
-	case SEARCH_DT:
+	if (acpi_disabled)
 		gufi_register_protocol(&of_protocol);
-		break;
-	default:
-		BUG(0);
-	}
+	else
+		gufi_register_protocol(&acpi_protocol);
 
 	return 0;
 }
