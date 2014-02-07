@@ -28,13 +28,13 @@
 #include <linux/slab.h>
 #include <linux/of.h>
 #include <linux/of_gpio.h>
+#include <linux/acpi.h>
 #include <linux/regulator/of_regulator.h>
 #include <linux/regulator/machine.h>
 
 struct fixed_voltage_data {
 	struct regulator_desc desc;
 	struct regulator_dev *dev;
-	int microvolts;
 };
 
 
@@ -108,30 +108,98 @@ of_get_fixed_voltage_config(struct device *dev)
 	return config;
 }
 
-static int fixed_voltage_get_voltage(struct regulator_dev *dev)
+#if defined(CONFIG_ACPI)
+static struct fixed_voltage_config *
+acpi_get_fixed_voltage_config(struct device *dev)
 {
-	struct fixed_voltage_data *data = rdev_get_drvdata(dev);
+	struct fixed_voltage_config *config;
+	struct regulator_init_data *init_data;
+	struct acpi_dsm_entry entry;
+	int len, always_on;
 
-	if (data->microvolts)
-		return data->microvolts;
-	else
-		return -EINVAL;
+	config = devm_kzalloc(dev, sizeof(struct fixed_voltage_config),
+								 GFP_KERNEL);
+	if (!config)
+		return ERR_PTR(-ENOMEM);
+
+	config->init_data = devm_kzalloc(dev,
+					 sizeof(struct regulator_init_data),
+					 GFP_KERNEL);
+	if (!config->init_data)
+		return ERR_PTR(-ENOMEM);
+
+	init_data = config->init_data;
+	init_data->constraints.apply_uV = 0;
+
+	if (acpi_dsm_lookup_value(ACPI_HANDLE(dev),
+				"regulator-name", 0, &entry) == 0) {
+		if (!entry.value) {
+			dev_err(dev, "invalid 'name' in ACPI definition\n");
+			return ERR_PTR(-EINVAL);
+		}
+
+		len = strlen(entry.value) + 1;
+		init_data->constraints.name = devm_kzalloc(dev, len,
+							   GFP_KERNEL);
+		strncpy((char *)init_data->constraints.name, entry.value, len);
+		kfree(entry.key);
+		kfree(entry.value);
+	}
+
+	if (acpi_dsm_lookup_value(ACPI_HANDLE(dev), "regulator-min-microvolts",
+					0, &entry) == 0) {
+		if (kstrtoint(entry.value, 0, &init_data->constraints.min_uV)
+			!= 0) {
+			dev_err(dev, "invalid 'min_uV' in ACPI definition\n");
+			return ERR_PTR(-EINVAL);
+		}
+		kfree(entry.key);
+		kfree(entry.value);
+	}
+
+	if (acpi_dsm_lookup_value(ACPI_HANDLE(dev), "regulator-max-microvolts",
+					0, &entry) == 0) {
+		if (kstrtoint(entry.value, 0, &init_data->constraints.max_uV)
+			!= 0) {
+			dev_err(dev, "invalid 'max_uV' in ACPI definition\n");
+			return ERR_PTR(-EINVAL);
+		}
+		kfree(entry.key);
+		kfree(entry.value);
+	}
+
+	if (acpi_dsm_lookup_value(ACPI_HANDLE(dev), "regulator-always-on",
+					0, &entry) == 0) {
+		if (kstrtoint(entry.value, 0, &always_on) != 0) {
+			dev_err(dev, "invalid 'max_uV' in ACPI definition\n");
+			return ERR_PTR(-EINVAL);
+		} else {
+			init_data->constraints.always_on = always_on;
+		}
+		kfree(entry.key);
+		kfree(entry.value);
+	}
+
+	config->supply_name = init_data->constraints.name;
+	if (init_data->constraints.min_uV == init_data->constraints.max_uV) {
+		config->microvolts = init_data->constraints.min_uV;
+	} else {
+		dev_err(dev,
+			 "Fixed regulator specified with variable voltages\n");
+		return ERR_PTR(-EINVAL);
+	}
+
+	return config;
 }
-
-static int fixed_voltage_list_voltage(struct regulator_dev *dev,
-				      unsigned selector)
+#else
+static struct fixed_voltage_config *
+acpi_get_fixed_voltage_config(struct device *dev)
 {
-	struct fixed_voltage_data *data = rdev_get_drvdata(dev);
-
-	if (selector != 0)
-		return -EINVAL;
-
-	return data->microvolts;
+	return ERR_PTR(-EINVAL);
 }
+#endif
 
 static struct regulator_ops fixed_voltage_ops = {
-	.get_voltage = fixed_voltage_get_voltage,
-	.list_voltage = fixed_voltage_list_voltage,
 };
 
 static int reg_fixed_voltage_probe(struct platform_device *pdev)
@@ -186,23 +254,21 @@ static int reg_fixed_voltage_probe(struct platform_device *pdev)
 	if (config->microvolts)
 		drvdata->desc.n_voltages = 1;
 
-	drvdata->microvolts = config->microvolts;
+	drvdata->desc.fixed_uV = config->microvolts;
 
 	if (config->gpio >= 0)
 		cfg.ena_gpio = config->gpio;
 	cfg.ena_gpio_invert = !config->enable_high;
 	if (config->enabled_at_boot) {
-		if (config->enable_high) {
+		if (config->enable_high)
 			cfg.ena_gpio_flags |= GPIOF_OUT_INIT_HIGH;
-		} else {
+		else
 			cfg.ena_gpio_flags |= GPIOF_OUT_INIT_LOW;
-		}
 	} else {
-		if (config->enable_high) {
+		if (config->enable_high)
 			cfg.ena_gpio_flags |= GPIOF_OUT_INIT_LOW;
-		} else {
+		else
 			cfg.ena_gpio_flags |= GPIOF_OUT_INIT_HIGH;
-		}
 	}
 	if (config->gpio_is_open_drain)
 		cfg.ena_gpio_flags |= GPIOF_OPEN_DRAIN;
@@ -222,7 +288,7 @@ static int reg_fixed_voltage_probe(struct platform_device *pdev)
 	platform_set_drvdata(pdev, drvdata);
 
 	dev_dbg(&pdev->dev, "%s supplying %duV\n", drvdata->desc.name,
-		drvdata->microvolts);
+		drvdata->desc.fixed_uV);
 
 	return 0;
 
@@ -253,6 +319,13 @@ static const struct of_device_id fixed_of_match[] = {
 MODULE_DEVICE_TABLE(of, fixed_of_match);
 #endif
 
+#if defined(CONFIG_ACPI)
+static const struct acpi_device_id fixed_acpi_match[] = {
+	{ .id = "LNRO0019", },
+	{},
+};
+#endif
+
 static struct platform_driver regulator_fixed_voltage_driver = {
 	.probe		= reg_fixed_voltage_probe,
 	.remove		= reg_fixed_voltage_remove,
@@ -260,6 +333,7 @@ static struct platform_driver regulator_fixed_voltage_driver = {
 		.name		= "reg-fixed-voltage",
 		.owner		= THIS_MODULE,
 		.of_match_table = of_match_ptr(fixed_of_match),
+		.acpi_match_table = ACPI_PTR(fixed_acpi_match),
 	},
 };
 

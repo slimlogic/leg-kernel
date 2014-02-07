@@ -28,6 +28,7 @@
 #include "session.h"
 #include "perf_regs.h"
 #include "unwind.h"
+#include "symbol.h"
 #include "util.h"
 
 extern int
@@ -158,23 +159,6 @@ static int __dw_read_encoded_value(u8 **p, u8 *end, u64 *val,
 	__v;                                                    \
 	})
 
-static Elf_Scn *elf_section_by_name(Elf *elf, GElf_Ehdr *ep,
-				    GElf_Shdr *shp, const char *name)
-{
-	Elf_Scn *sec = NULL;
-
-	while ((sec = elf_nextscn(elf, sec)) != NULL) {
-		char *str;
-
-		gelf_getshdr(sec, shp);
-		str = elf_strptr(elf, ep->e_shstrndx, shp->sh_name);
-		if (!strcmp(name, str))
-			break;
-	}
-
-	return sec;
-}
-
 static u64 elf_section_offset(int fd, const char *name)
 {
 	Elf *elf;
@@ -190,7 +174,7 @@ static u64 elf_section_offset(int fd, const char *name)
 		if (gelf_getehdr(elf, &ehdr) == NULL)
 			break;
 
-		if (!elf_section_by_name(elf, &ehdr, &shdr, name))
+		if (!elf_section_by_name(elf, &ehdr, &shdr, name, NULL))
 			break;
 
 		offset = shdr.sh_offset;
@@ -277,6 +261,7 @@ static int read_unwind_spec_eh_frame(struct dso *dso, struct machine *machine,
 	return ret;
 }
 
+#ifndef NO_LIBUNWIND_DEBUG_FRAME
 static int read_unwind_spec_debug_frame(struct dso *dso,
 					struct machine *machine, u64 *offset)
 {
@@ -294,6 +279,7 @@ static int read_unwind_spec_debug_frame(struct dso *dso,
 
 	return -EINVAL;
 }
+#endif
 
 static struct map *find_map(unw_word_t ip, struct unwind_info *ui)
 {
@@ -334,14 +320,16 @@ find_proc_info(unw_addr_space_t as, unw_word_t ip, unw_proc_info_t *pi,
 						 need_unwind_info, arg);
 	}
 
+#ifndef NO_LIBUNWIND_DEBUG_FRAME
 	/* Check the .debug_frame section for unwinding info */
 	if (!read_unwind_spec_debug_frame(map->dso, ui->machine, &segbase)) {
 		memset(&di, 0, sizeof(di));
-		dwarf_find_debug_frame(0, &di, ip, 0, map->dso->name,
-				       map->start, map->end);
-		return dwarf_search_unwind_table(as, ip, &di, pi,
-						 need_unwind_info, arg);
+		if (dwarf_find_debug_frame(0, &di, ip, 0, map->dso->name,
+					   map->start, map->end))
+			return dwarf_search_unwind_table(as, ip, &di, pi,
+							 need_unwind_info, arg);
 	}
+#endif
 
 	return -EINVAL;
 }
@@ -555,7 +543,7 @@ static unw_accessors_t accessors = {
 };
 
 static int get_entries(struct unwind_info *ui, unwind_entry_cb_t cb,
-		       void *arg)
+		       void *arg, int max_stack)
 {
 	unw_addr_space_t addr_space;
 	unw_cursor_t c;
@@ -571,7 +559,7 @@ static int get_entries(struct unwind_info *ui, unwind_entry_cb_t cb,
 	if (ret)
 		display_error(ret);
 
-	while (!ret && (unw_step(&c) > 0)) {
+	while (!ret && (unw_step(&c) > 0) && max_stack--) {
 		unw_word_t ip;
 
 		unw_get_reg(&c, UNW_REG_IP, &ip);
@@ -584,7 +572,8 @@ static int get_entries(struct unwind_info *ui, unwind_entry_cb_t cb,
 
 int unwind__get_entries(unwind_entry_cb_t cb, void *arg,
 			struct machine *machine, struct thread *thread,
-			u64 sample_uregs, struct perf_sample *data)
+			u64 sample_uregs, struct perf_sample *data,
+			int max_stack)
 {
 	unw_word_t ip;
 	struct unwind_info ui = {
@@ -606,5 +595,5 @@ int unwind__get_entries(unwind_entry_cb_t cb, void *arg,
 	if (ret)
 		return -ENOMEM;
 
-	return get_entries(&ui, cb, arg);
+	return get_entries(&ui, cb, arg, max_stack);
 }

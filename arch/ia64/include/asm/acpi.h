@@ -111,8 +111,6 @@ static inline const char *acpi_get_sysname (void)
 	return "uv";
 # elif defined (CONFIG_IA64_DIG)
 	return "dig";
-# elif defined (CONFIG_IA64_XEN_GUEST)
-	return "xen";
 # elif defined(CONFIG_IA64_DIG_VTD)
 	return "dig_vtd";
 # else
@@ -154,10 +152,7 @@ extern int __initdata nid_to_pxm_map[MAX_NUMNODES];
 #endif
 
 static inline bool arch_has_acpi_pdc(void) { return true; }
-static inline void arch_acpi_set_pdc_bits(u32 *buf)
-{
-	buf[2] |= ACPI_PDC_EST_CAPABILITY_SMP;
-}
+extern void arch_acpi_set_pdc_bits(u32 *buf);
 
 #define acpi_unlazy_tlb(x)
 

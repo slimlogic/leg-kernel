@@ -3,6 +3,7 @@ config GATOR
 	default m if (ARM || ARM64)
 	depends on PROFILING
 	depends on HIGH_RES_TIMERS
+	depends on (PERF_EVENTS && HW_PERF_EVENTS) || ARM64
 	select TRACING
 
 config GATOR_WITH_MALI_SUPPORT

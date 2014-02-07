@@ -20,7 +20,6 @@
 #include <linux/platform_device.h>
 #include <linux/clk.h>
 #include <linux/io.h>
-#include <linux/clk.h>
 #include <linux/slab.h>
 
 /* Hardware register offsets and field defintions */
@@ -153,32 +152,18 @@ static const struct hs_bus_speed_cfg hs_cfg_table[] = {
 };
 
 struct bcm_kona_i2c_dev {
-	/* Pointer to linux device struct */
 	struct device *device;
 
-	/* Virtual address where registers are mapped */
 	void __iomem *base;
-
-	/* Interrupt */
 	int irq;
+	struct clk *external_clk;
 
-	/* Standard Speed configuration */
-	const struct bus_speed_cfg *std_cfg;
-
-	/* High Speed configuration (if applicable) */
-	const struct hs_bus_speed_cfg *hs_cfg;
-
-	/* Linux I2C adapter struct */
 	struct i2c_adapter adapter;
 
-	/* Lock for the I2C device */
-	struct mutex i2c_bcm_lock;
-
-	/* Completion to signal an operation finished */
 	struct completion done;
 
-	/* Handle for external clock */
-	struct clk *external_clk;
+	const struct bus_speed_cfg *std_cfg;
+	const struct hs_bus_speed_cfg *hs_cfg;
 };
 
 static void bcm_kona_i2c_send_cmd_to_ctrl(struct bcm_kona_i2c_dev *dev,
@@ -279,7 +264,7 @@ static int bcm_kona_send_i2c_cmd(struct bcm_kona_i2c_dev *dev,
 	writel(IER_I2C_INT_EN_MASK, dev->base + IER_OFFSET);
 
 	/* Mark as incomplete before sending the command */
-	INIT_COMPLETION(dev->done);
+	reinit_completion(&dev->done);
 
 	/* Send the command */
 	bcm_kona_i2c_send_cmd_to_ctrl(dev, cmd);
@@ -309,7 +294,7 @@ static int bcm_kona_i2c_read_fifo_single(struct bcm_kona_i2c_dev *dev,
 	unsigned long time_left = msecs_to_jiffies(I2C_TIMEOUT);
 
 	/* Mark as incomplete before starting the RX FIFO */
-	INIT_COMPLETION(dev->done);
+	reinit_completion(&dev->done);
 
 	/* Unmask the read complete interrupt */
 	writel(IER_READ_COMPLETE_INT_MASK, dev->base + IER_OFFSET);
@@ -344,7 +329,7 @@ static int bcm_kona_i2c_read_fifo(struct bcm_kona_i2c_dev *dev,
 	unsigned int bytes_to_read = MAX_RX_FIFO_SIZE;
 	unsigned int last_byte_nak = 0;
 	unsigned int bytes_read = 0;
-	unsigned int rc;
+	int rc;
 
 	uint8_t *tmp_buf = msg->buf;
 
@@ -386,7 +371,7 @@ static int bcm_kona_i2c_write_byte(struct bcm_kona_i2c_dev *dev, uint8_t data,
 	writel(IER_I2C_INT_EN_MASK, dev->base + IER_OFFSET);
 
 	/* Mark as incomplete before sending the data */
-	INIT_COMPLETION(dev->done);
+	reinit_completion(&dev->done);
 
 	/* Send one byte of data */
 	writel(data, dev->base + DAT_OFFSET);
@@ -421,7 +406,7 @@ static int bcm_kona_i2c_write_fifo_single(struct bcm_kona_i2c_dev *dev,
 	unsigned int fifo_status;
 
 	/* Mark as incomplete before sending data to the TX FIFO */
-	INIT_COMPLETION(dev->done);
+	reinit_completion(&dev->done);
 
 	/* Unmask the fifo empty and nak interrupt */
 	writel(IER_FIFO_INT_EN_MASK | IER_NOACK_EN_MASK,
@@ -468,7 +453,7 @@ static int bcm_kona_i2c_write_fifo(struct bcm_kona_i2c_dev *dev,
 {
 	unsigned int bytes_to_write = MAX_TX_FIFO_SIZE;
 	unsigned int bytes_written = 0;
-	unsigned int rc;
+	int rc;
 
 	uint8_t *tmp_buf = msg->buf;
 
@@ -592,10 +577,8 @@ static int bcm_kona_i2c_switch_to_hs(struct bcm_kona_i2c_dev *dev)
 
 	/* Send a restart command */
 	rc = bcm_kona_send_i2c_cmd(dev, BCM_CMD_RESTART);
-	if (rc < 0) {
-		dev_err(dev->device,
-		"High speed restart command failed rc = %d\n", rc);
-	}
+	if (rc < 0)
+		dev_err(dev->device, "High speed restart command failed\n");
 
 	return rc;
 }
@@ -626,13 +609,11 @@ static int bcm_kona_i2c_xfer(struct i2c_adapter *adapter,
 	int rc = 0;
 	int i;
 
-	mutex_lock(&dev->i2c_bcm_lock);
-
 	rc = clk_prepare_enable(dev->external_clk);
 	if (rc) {
 		dev_err(dev->device, "%s: peri clock enable failed. err %d\n",
 			__func__, rc);
-		goto xfer_mutex_unlock;
+		return rc;
 	}
 
 	/* Enable pad output */
@@ -705,6 +686,7 @@ xfer_send_stop:
 	/* Return from high speed if applicable */
 	if (dev->hs_cfg) {
 		int hs_rc = bcm_kona_i2c_switch_to_std(dev);
+
 		if (hs_rc)
 			rc = hs_rc;
 	}
@@ -718,14 +700,13 @@ xfer_disable_pad:
 
 	clk_disable_unprepare(dev->external_clk);
 
-xfer_mutex_unlock:
-	mutex_unlock(&dev->i2c_bcm_lock);
 	return rc;
 }
 
 static uint32_t bcm_kona_i2c_functionality(struct i2c_adapter *adap)
 {
-	return I2C_FUNC_I2C | I2C_FUNC_SMBUS_EMUL | I2C_FUNC_10BIT_ADDR;
+	return I2C_FUNC_I2C | I2C_FUNC_SMBUS_EMUL | I2C_FUNC_10BIT_ADDR |
+	    I2C_FUNC_NOSTART;
 }
 
 static const struct i2c_algorithm bcm_algo = {
@@ -760,8 +741,9 @@ static int bcm_kona_i2c_assign_bus_speed(struct bcm_kona_i2c_dev *dev)
 		break;
 	default:
 		pr_err("%d hz bus speed not supported\n", bus_speed);
+		pr_err("Valid speeds are 100khz, 400khz, 1mhz, and 3.4mhz\n");
 		return -EINVAL;
-	};
+	}
 
 	return 0;
 }
@@ -775,47 +757,42 @@ static int bcm_kona_i2c_probe(struct platform_device *pdev)
 
 	/* Allocate memory for private data structure */
 	dev = devm_kzalloc(&pdev->dev, sizeof(*dev), GFP_KERNEL);
-	if (!dev) {
-		rc = -ENOMEM;
-		goto probe_return;
-	}
+	if (!dev)
+		return -ENOMEM;
 
 	platform_set_drvdata(pdev, dev);
 	dev->device = &pdev->dev;
-	mutex_init(&dev->i2c_bcm_lock);
 	init_completion(&dev->done);
 
 	/* Map hardware registers */
 	iomem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	dev->base = devm_ioremap_resource(dev->device, iomem);
-	if (IS_ERR(dev->base)) {
-		rc = PTR_ERR(dev->base);
-		goto probe_return;
-	}
+	if (IS_ERR(dev->base))
+		return -ENOMEM;
 
 	/* Get and enable external clock */
 	dev->external_clk = devm_clk_get(dev->device, NULL);
 	if (IS_ERR(dev->external_clk)) {
 		dev_err(dev->device, "couldn't get clock\n");
-		rc = -ENODEV;
-		goto probe_return;
+		return -ENODEV;
 	}
 
 	rc = clk_set_rate(dev->external_clk, STD_EXT_CLK_FREQ);
 	if (rc) {
 		dev_err(dev->device, "%s: clk_set_rate returned %d\n",
 			__func__, rc);
-		goto probe_return;
+		return rc;
 	}
 
 	rc = clk_prepare_enable(dev->external_clk);
 	if (rc) {
 		dev_err(dev->device, "couldn't enable clock\n");
-		goto probe_return;
+		return rc;
 	}
 
 	/* Parse bus speed */
-	if (bcm_kona_i2c_assign_bus_speed(dev))
+	rc = bcm_kona_i2c_assign_bus_speed(dev);
+	if (rc)
 		goto probe_disable_clk;
 
 	/* Enable internal clocks */
@@ -878,17 +855,15 @@ static int bcm_kona_i2c_probe(struct platform_device *pdev)
 	adap = &dev->adapter;
 	i2c_set_adapdata(adap, dev);
 	adap->owner = THIS_MODULE;
-	adap->class = UINT_MAX;	/* can be used by any I2C device */
 	strlcpy(adap->name, "Broadcom I2C adapter", sizeof(adap->name));
 	adap->algo = &bcm_algo;
 	adap->dev.parent = &pdev->dev;
-	adap->nr = pdev->id;
 	adap->dev.of_node = pdev->dev.of_node;
 
-	rc = i2c_add_numbered_adapter(adap);
+	rc = i2c_add_adapter(adap);
 	if (rc) {
 		dev_err(dev->device, "failed to add adapter\n");
-		goto probe_disable_clk;
+		return rc;
 	}
 
 	dev_info(dev->device, "device registered successfully\n");
@@ -899,8 +874,6 @@ probe_disable_clk:
 	bcm_kona_i2c_disable_clock(dev);
 	clk_disable_unprepare(dev->external_clk);
 
-probe_return:
-	dev_err(&pdev->dev, "probe failed\n");
 	return rc;
 }
 
@@ -909,7 +882,6 @@ static int bcm_kona_i2c_remove(struct platform_device *pdev)
 	struct bcm_kona_i2c_dev *dev = platform_get_drvdata(pdev);
 
 	i2c_del_adapter(&dev->adapter);
-	platform_set_drvdata(pdev, NULL);
 
 	return 0;
 }
@@ -918,7 +890,7 @@ static const struct of_device_id bcm_kona_i2c_of_match[] = {
 	{.compatible = "brcm,kona-i2c",},
 	{},
 };
-MODULE_DEVICE_TABLE(of, kona_i2c_of_match);
+MODULE_DEVICE_TABLE(of, bcm_kona_i2c_of_match);
 
 static struct platform_driver bcm_kona_i2c_driver = {
 	.driver = {
@@ -931,6 +903,6 @@ static struct platform_driver bcm_kona_i2c_driver = {
 };
 module_platform_driver(bcm_kona_i2c_driver);
 
-MODULE_AUTHOR("Broadcom");
+MODULE_AUTHOR("Tim Kryger <tkryger@broadcom.com>");
 MODULE_DESCRIPTION("Broadcom Kona I2C Driver");
 MODULE_LICENSE("GPL v2");

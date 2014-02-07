@@ -397,37 +397,6 @@ int bL_switch_request_cb(unsigned int cpu, unsigned int new_cluster_id,
 EXPORT_SYMBOL_GPL(bL_switch_request_cb);
 
 /*
- * Detach an outstanding switch request.
- *
- * The switcher will continue with the switch request in the background,
- * but the completer function will not be called.
- *
- * This may be necessary if the completer is in a kernel module which is
- * about to be unloaded.
- */
-void bL_switch_request_detach(unsigned int cpu,
-			      bL_switch_completion_handler completer)
-{
-	struct bL_thread *t;
-
-	if (cpu >= ARRAY_SIZE(bL_threads)) {
-		pr_err("%s: cpu %d out of bounds\n", __func__, cpu);
-		return;
-	}
-
-	t = &bL_threads[cpu];
-
-	if (IS_ERR(t->task) || !t->task)
-		return;
-
-	spin_lock(&t->lock);
-	if (t->completer == completer)
-		t->completer = NULL;
-	spin_unlock(&t->lock);
-}
-EXPORT_SYMBOL_GPL(bL_switch_request_detach);
-
-/*
  * Activation and configuration code.
  */
 
@@ -608,9 +577,9 @@ static int bL_switcher_enable(void)
 	int cpu, ret;
 
 	mutex_lock(&bL_switcher_activation_lock);
-	cpu_hotplug_driver_lock();
+	lock_device_hotplug();
 	if (bL_switcher_active) {
-		cpu_hotplug_driver_unlock();
+		unlock_device_hotplug();
 		mutex_unlock(&bL_switcher_activation_lock);
 		return 0;
 	}
@@ -646,7 +615,7 @@ error:
 	bL_activation_notify(BL_NOTIFY_POST_DISABLE);
 
 out:
-	cpu_hotplug_driver_unlock();
+	unlock_device_hotplug();
 	mutex_unlock(&bL_switcher_activation_lock);
 	return ret;
 }
@@ -660,7 +629,7 @@ static void bL_switcher_disable(void)
 	struct task_struct *task;
 
 	mutex_lock(&bL_switcher_activation_lock);
-	cpu_hotplug_driver_lock();
+	lock_device_hotplug();
 
 	if (!bL_switcher_active)
 		goto out;
@@ -716,7 +685,7 @@ static void bL_switcher_disable(void)
 	bL_activation_notify(BL_NOTIFY_POST_DISABLE);
 
 out:
-	cpu_hotplug_driver_unlock();
+	unlock_device_hotplug();
 	mutex_unlock(&bL_switcher_activation_lock);
 }
 
@@ -821,11 +790,7 @@ static int bL_switcher_hotplug_callback(struct notifier_block *nfb,
 	return NOTIFY_DONE;
 }
 
-#ifdef CONFIG_SCHED_HMP
-static bool no_bL_switcher = true;
-#else
 static bool no_bL_switcher;
-#endif
 core_param(no_bL_switcher, no_bL_switcher, bool, 0644);
 
 static int __init bL_switcher_init(void)

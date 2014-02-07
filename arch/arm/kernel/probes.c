@@ -12,11 +12,9 @@
  */
 
 #include <linux/kernel.h>
-#include <linux/kprobes.h>
 #include <asm/system_info.h>
 
 #include "probes.h"
-
 
 #ifndef find_str_pc_offset
 
@@ -174,13 +172,13 @@ probes_check_cc * const probes_condition_checks[16] = {
 
 
 void __kprobes probes_simulate_nop(probes_opcode_t opcode,
-	probes_opcode_t *addr, struct arch_specific_insn *asi,
+	struct arch_probes_insn *asi,
 	struct pt_regs *regs)
 {
 }
 
 void __kprobes probes_emulate_none(probes_opcode_t opcode,
-	probes_opcode_t *addr, struct arch_specific_insn *asi,
+	struct arch_probes_insn *asi,
 	struct pt_regs *regs)
 {
 	asi->insn_fn();
@@ -194,8 +192,8 @@ void __kprobes probes_emulate_none(probes_opcode_t opcode,
  * emulation handler is called.
  */
 static probes_opcode_t __kprobes
-prepare_emulated_insn(probes_opcode_t insn, struct arch_specific_insn *asi,
-			bool thumb)
+prepare_emulated_insn(probes_opcode_t insn, struct arch_probes_insn *asi,
+		      bool thumb)
 {
 #ifdef CONFIG_THUMB2_KERNEL
 	if (thumb) {
@@ -219,8 +217,8 @@ prepare_emulated_insn(probes_opcode_t insn, struct arch_specific_insn *asi,
  * prepare_emulated_insn
  */
 static void  __kprobes
-set_emulated_insn(probes_opcode_t insn, struct arch_specific_insn *asi,
-			bool thumb)
+set_emulated_insn(probes_opcode_t insn, struct arch_probes_insn *asi,
+		  bool thumb)
 {
 #ifdef CONFIG_THUMB2_KERNEL
 	if (thumb) {
@@ -319,11 +317,6 @@ static bool __kprobes decode_regs(probes_opcode_t *pinsn, u32 regs, bool modify)
 		/* Replace value of nibble with new register number... */
 		insn &= ~mask;
 		insn |= new_bits & mask;
-		if (modify) {
-			/* Replace value of nibble with new register number */
-			insn &= ~mask;
-			insn |= new_bits & mask;
-		}
 	}
 
 	if (modify)
@@ -388,15 +381,15 @@ static const int decode_struct_sizes[NUM_DECODE_TYPES] = {
  *
  */
 int __kprobes
-probes_decode_insn(probes_opcode_t insn, struct arch_specific_insn *asi,
-				const union decode_item *table, bool thumb,
-				bool usermode, const union decode_item *actions)
+probes_decode_insn(probes_opcode_t insn, struct arch_probes_insn *asi,
+		   const union decode_item *table, bool thumb,
+		   bool emulate, const union decode_action *actions)
 {
 	struct decode_header *h = (struct decode_header *)table;
 	struct decode_header *next;
 	bool matched = false;
 
-	if (!usermode)
+	if (emulate)
 		insn = prepare_emulated_insn(insn, asi, thumb);
 
 	for (;; h = next) {
@@ -412,7 +405,7 @@ probes_decode_insn(probes_opcode_t insn, struct arch_specific_insn *asi,
 		if (!matched && (insn & h->mask.bits) != h->value.bits)
 			continue;
 
-		if (!decode_regs(&insn, regs, !usermode))
+		if (!decode_regs(&insn, regs, emulate))
 			return INSN_REJECTED;
 
 		switch (type) {
@@ -425,24 +418,23 @@ probes_decode_insn(probes_opcode_t insn, struct arch_specific_insn *asi,
 
 		case DECODE_TYPE_CUSTOM: {
 			struct decode_custom *d = (struct decode_custom *)h;
-			return actions[d->decoder.bits].decoder(insn,
-					asi, h);
+			return actions[d->decoder.action].decoder(insn, asi, h);
 		}
 
 		case DECODE_TYPE_SIMULATE: {
 			struct decode_simulate *d = (struct decode_simulate *)h;
-			asi->insn_handler = actions[d->handler.bits].handler;
+			asi->insn_handler = actions[d->handler.action].handler;
 			return INSN_GOOD_NO_SLOT;
 		}
 
 		case DECODE_TYPE_EMULATE: {
 			struct decode_emulate *d = (struct decode_emulate *)h;
 
-			if (usermode)
-				return actions[d->handler.bits].decoder(insn,
-								asi, h);
+			if (!emulate)
+				return actions[d->handler.action].decoder(insn,
+					asi, h);
 
-			asi->insn_handler = actions[d->handler.bits].handler;
+			asi->insn_handler = actions[d->handler.action].handler;
 			set_emulated_insn(insn, asi, thumb);
 			return INSN_GOOD;
 		}

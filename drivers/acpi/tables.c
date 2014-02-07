@@ -194,7 +194,7 @@ void acpi_table_print_madt_entry(struct acpi_subtable_header *header)
 	case ACPI_MADT_TYPE_GENERIC_INTERRUPT:
 		{
 			struct acpi_madt_generic_interrupt *p =
-			    (struct acpi_madt_generic_interrupt *)header;
+				(struct acpi_madt_generic_interrupt *)header;
 			printk(KERN_INFO PREFIX
 			       "GIC (acpi_id[0x%04x] gic_id[0x%04x] %s)\n",
 			       p->uid, p->gic_id,
@@ -205,7 +205,7 @@ void acpi_table_print_madt_entry(struct acpi_subtable_header *header)
 	case ACPI_MADT_TYPE_GENERIC_DISTRIBUTOR:
 		{
 			struct acpi_madt_generic_distributor *p =
-			    (struct acpi_madt_generic_distributor *)header;
+				(struct acpi_madt_generic_distributor *)header;
 			printk(KERN_INFO PREFIX
 			       "GIC Distributor (id[0x%04x] address[0x%08llx] gsi_base[%d])\n",
 			       p->gic_id, p->base_address, p->global_irq_base);
@@ -299,12 +299,13 @@ acpi_table_parse_madt(enum acpi_madt_type id,
 
 /**
  * acpi_table_parse - find table with @id, run @handler on it
- *
  * @id: table id to find
  * @handler: handler to run
  *
  * Scan the ACPI System Descriptor Table (STD) for a table matching @id,
- * run @handler on it.  Return 0 if table found, return on if not.
+ * run @handler on it.
+ *
+ * Return 0 if table found, -errno if not.
  */
 int __init acpi_table_parse(char *id, acpi_tbl_table_handler handler)
 {
@@ -314,7 +315,7 @@ int __init acpi_table_parse(char *id, acpi_tbl_table_handler handler)
 	if (acpi_disabled)
 		return -ENODEV;
 
-	if (!handler)
+	if (!id || !handler)
 		return -EINVAL;
 
 	if (strncmp(id, ACPI_SIG_MADT, 4) == 0)
@@ -327,7 +328,7 @@ int __init acpi_table_parse(char *id, acpi_tbl_table_handler handler)
 		early_acpi_os_unmap_memory(table, tbl_size);
 		return 0;
 	} else
-		return 1;
+		return -ENODEV;
 }
 
 /* 
@@ -372,7 +373,7 @@ int __init acpi_table_init(void)
 
 	status = acpi_initialize_tables(initial_tables, ACPI_MAX_TABLES, 0);
 	if (ACPI_FAILURE(status))
-		return 1;
+		return -EINVAL;
 
 	check_multiple_madt();
 	return 0;

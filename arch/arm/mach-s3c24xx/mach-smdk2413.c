@@ -21,6 +21,7 @@
 #include <linux/serial_core.h>
 #include <linux/platform_device.h>
 #include <linux/io.h>
+#include <linux/memblock.h>
 
 #include <asm/mach/arch.h>
 #include <asm/mach/map.h>
@@ -39,6 +40,7 @@
 
 #include <linux/platform_data/usb-s3c2410_udc.h>
 #include <linux/platform_data/i2c-s3c2410.h>
+#include <mach/gpio-samsung.h>
 #include <mach/fb.h>
 
 #include <plat/clock.h>
@@ -89,15 +91,13 @@ static struct platform_device *smdk2413_devices[] __initdata = {
 	&s3c_device_i2c0,
 	&s3c_device_iis,
 	&s3c_device_usbgadget,
+	&s3c2412_device_dma,
 };
 
-static void __init smdk2413_fixup(struct tag *tags, char **cmdline,
-				  struct meminfo *mi)
+static void __init smdk2413_fixup(struct tag *tags, char **cmdline)
 {
 	if (tags != phys_to_virt(S3C2410_SDRAM_PA + 0x100)) {
-		mi->nr_banks=1;
-		mi->bank[0].start = 0x30000000;
-		mi->bank[0].size = SZ_64M;
+		memblock_add(0x30000000, SZ_64M);
 	}
 }
 

@@ -35,8 +35,7 @@ void mcpm_set_early_poke(unsigned cpu, unsigned cluster,
 	unsigned long *poke = &mcpm_entry_early_pokes[cluster][cpu][0];
 	poke[0] = poke_phys_addr;
 	poke[1] = poke_val;
-	__cpuc_flush_dcache_area((void *)poke, 8);
-	outer_clean_range(__pa(poke), __pa(poke + 2));
+	__sync_cache_range_w(poke, 2 * sizeof(*poke));
 }
 
 static const struct mcpm_platform_ops *platform_ops;
@@ -102,6 +101,21 @@ void mcpm_cpu_power_down(void)
 	BUG();
 }
 
+int mcpm_cpu_power_down_finish(unsigned int cpu, unsigned int cluster)
+{
+	int ret;
+
+	if (WARN_ON_ONCE(!platform_ops || !platform_ops->power_down_finish))
+		return -EUNATCH;
+
+	ret = platform_ops->power_down_finish(cpu, cluster);
+	if (ret)
+		pr_warn("%s: cpu %u, cluster %u failed to power down (%d)\n",
+			__func__, cpu, cluster, ret);
+
+	return ret;
+}
+
 void mcpm_cpu_suspend(u64 expected_residency)
 {
 	phys_reset_t phys_reset;
@@ -152,7 +166,7 @@ void __mcpm_cpu_down(unsigned int cpu, unsigned int cluster)
 	dmb();
 	mcpm_sync.clusters[cluster].cpus[cpu].cpu = CPU_DOWN;
 	sync_cache_w(&mcpm_sync.clusters[cluster].cpus[cpu].cpu);
-	dsb_sev();
+	sev();
 }
 
 /*
@@ -168,7 +182,7 @@ void __mcpm_outbound_leave_critical(unsigned int cluster, int state)
 	dmb();
 	mcpm_sync.clusters[cluster].cluster = state;
 	sync_cache_w(&mcpm_sync.clusters[cluster].cluster);
-	dsb_sev();
+	sev();
 }
 
 /*

@@ -10,8 +10,7 @@
 #include <linux/export.h>
 #include <linux/dmi.h>
 #include <linux/slab.h>
-
-#include <acpi/acpi_drivers.h>
+#include <linux/acpi.h>
 #include <acpi/processor.h>
 
 #include "internal.h"
@@ -45,13 +44,13 @@ static int map_lapic_id(struct acpi_subtable_header *entry,
 		(struct acpi_madt_local_apic *)entry;
 
 	if (!(lapic->lapic_flags & ACPI_MADT_ENABLED))
-		return 0;
+		return -ENODEV;
 
 	if (lapic->processor_id != acpi_id)
-		return 0;
+		return -EINVAL;
 
 	*apic_id = lapic->id;
-	return 1;
+	return 0;
 }
 
 static int map_x2apic_id(struct acpi_subtable_header *entry,
@@ -61,14 +60,14 @@ static int map_x2apic_id(struct acpi_subtable_header *entry,
 		(struct acpi_madt_local_x2apic *)entry;
 
 	if (!(apic->lapic_flags & ACPI_MADT_ENABLED))
-		return 0;
+		return -ENODEV;
 
 	if (device_declaration && (apic->uid == acpi_id)) {
 		*apic_id = apic->local_apic_id;
-		return 1;
+		return 0;
 	}
 
-	return 0;
+	return -EINVAL;
 }
 
 static int map_lsapic_id(struct acpi_subtable_header *entry,
@@ -78,16 +77,37 @@ static int map_lsapic_id(struct acpi_subtable_header *entry,
 		(struct acpi_madt_local_sapic *)entry;
 
 	if (!(lsapic->lapic_flags & ACPI_MADT_ENABLED))
-		return 0;
+		return -ENODEV;
 
 	if (device_declaration) {
 		if ((entry->length < 16) || (lsapic->uid != acpi_id))
-			return 0;
+			return -EINVAL;
 	} else if (lsapic->processor_id != acpi_id)
-		return 0;
+		return -EINVAL;
 
 	*apic_id = (lsapic->id << 8) | lsapic->eid;
-	return 1;
+	return 0;
+}
+
+static int map_gic_id(struct acpi_subtable_header *entry,
+		int device_declaration, u32 acpi_id, int *apic_id)
+{
+	struct acpi_madt_generic_interrupt *gic =
+		(struct acpi_madt_generic_interrupt *)entry;
+
+	if (!(gic->flags & ACPI_MADT_ENABLED))
+		return 0;
+
+	/* In the GIC interrupt model, logical processors are
+	 * required to have a Processor Device object in the DSDT,
+	 * so we should check device_declaration here
+	 */
+	if (device_declaration && (gic->uid == acpi_id)) {
+		*apic_id = gic->gic_id;
+		return 1;
+	}
+
+	return 0;
 }
 
 static int map_gic_id(struct acpi_subtable_header *entry,
@@ -138,13 +158,16 @@ static int map_madt_entry(int type, u32 acpi_id)
 		struct acpi_subtable_header *header =
 			(struct acpi_subtable_header *)entry;
 		if (header->type == ACPI_MADT_TYPE_LOCAL_APIC) {
-			if (map_lapic_id(header, acpi_id, &apic_id))
+			if (!map_lapic_id(header, acpi_id, &apic_id))
 				break;
 		} else if (header->type == ACPI_MADT_TYPE_LOCAL_X2APIC) {
-			if (map_x2apic_id(header, type, acpi_id, &apic_id))
+			if (!map_x2apic_id(header, type, acpi_id, &apic_id))
 				break;
 		} else if (header->type == ACPI_MADT_TYPE_LOCAL_SAPIC) {
-			if (map_lsapic_id(header, type, acpi_id, &apic_id))
+			if (!map_lsapic_id(header, type, acpi_id, &apic_id))
+				break;
+		} else if (header->type == ACPI_MADT_TYPE_GENERIC_INTERRUPT) {
+			if (map_gic_id(header, type, acpi_id, &apic_id))
 				break;
 		} else if (header->type == ACPI_MADT_TYPE_GENERIC_INTERRUPT) {
 			if (map_gic_id(header, type, acpi_id, &apic_id))
@@ -188,16 +211,23 @@ exit:
 	return apic_id;
 }
 
-int acpi_get_cpuid(acpi_handle handle, int type, u32 acpi_id)
+int acpi_get_apicid(acpi_handle handle, int type, u32 acpi_id)
 {
-#ifdef CONFIG_SMP
-	int i;
-#endif
-	int apic_id = -1;
+	int apic_id;
 
 	apic_id = map_mat_entry(handle, type, acpi_id);
 	if (apic_id == -1)
 		apic_id = map_madt_entry(type, acpi_id);
+
+	return apic_id;
+}
+
+int acpi_map_cpuid(int apic_id, u32 acpi_id)
+{
+#ifdef CONFIG_SMP
+	int i;
+#endif
+
 	if (apic_id == -1) {
 		/*
 		 * On UP processor, there is no _MAT or MADT table.
@@ -237,6 +267,15 @@ int acpi_get_cpuid(acpi_handle handle, int type, u32 acpi_id)
 #endif
 
 	return -1;
+}
+
+int acpi_get_cpuid(acpi_handle handle, int type, u32 acpi_id)
+{
+	int apic_id;
+
+	apic_id = acpi_get_apicid(handle, type, acpi_id);
+
+	return acpi_map_cpuid(apic_id, acpi_id);
 }
 EXPORT_SYMBOL_GPL(acpi_get_cpuid);
 
@@ -285,9 +324,6 @@ static void acpi_set_pdc_bits(u32 *buf)
 	buf[0] = ACPI_PDC_REVISION_ID;
 	buf[1] = 1;
 
-	/* Enable coordination with firmware's _TSD info */
-	buf[2] = ACPI_PDC_SMP_T_SWCOORD;
-
 	/* Twiddle arch-specific bits needed for _PDC */
 	arch_acpi_set_pdc_bits(buf);
 }
@@ -312,7 +348,7 @@ static struct acpi_object_list *acpi_processor_alloc_pdc(void)
 		return NULL;
 	}
 
-	buf = kmalloc(12, GFP_KERNEL);
+	buf = kzalloc(12, GFP_KERNEL);
 	if (!buf) {
 		printk(KERN_ERR "Memory allocation error\n");
 		kfree(obj);
@@ -335,25 +371,11 @@ static struct acpi_object_list *acpi_processor_alloc_pdc(void)
  * _PDC is required for a BIOS-OS handshake for most of the newer
  * ACPI processor features.
  */
-static int
+static acpi_status
 acpi_processor_eval_pdc(acpi_handle handle, struct acpi_object_list *pdc_in)
 {
 	acpi_status status = AE_OK;
 
-	if (boot_option_idle_override == IDLE_NOMWAIT) {
-		/*
-		 * If mwait is disabled for CPU C-states, the C2C3_FFH access
-		 * mode will be disabled in the parameter of _PDC object.
-		 * Of course C1_FFH access mode will also be disabled.
-		 */
-		union acpi_object *obj;
-		u32 *buffer = NULL;
-
-		obj = pdc_in->pointer;
-		buffer = (u32 *)(obj->buffer.pointer);
-		buffer[2] &= ~(ACPI_PDC_C_C2C3_FFH | ACPI_PDC_C_C1_FFH);
-
-	}
 	status = acpi_evaluate_object(handle, "_PDC", pdc_in, NULL);
 
 	if (ACPI_FAILURE(status))

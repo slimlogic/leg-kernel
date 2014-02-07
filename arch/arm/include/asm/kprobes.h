@@ -29,8 +29,11 @@
 #define kretprobe_blacklist_size	0
 
 typedef u32 kprobe_opcode_t;
-
 struct kprobe;
+#include <asm/probes.h>
+
+#define	arch_specific_insn	arch_probes_insn
+
 struct prev_kprobe {
 	struct kprobe *kp;
 	unsigned int status;

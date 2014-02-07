@@ -1,3 +1,9 @@
+gator (5.17.0) saucy; urgency=low
+
+  * New release from ARM.
+
+ -- Jon Medhurst (Tixy) <jon.medhurst@linaro.org>  Wed, 18 Dec 2013 15:56:33 +0000
+
 gator (5.16.0) raring; urgency=low
 
   * New release from ARM.

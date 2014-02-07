@@ -218,13 +218,14 @@ static void vm_reset(struct virtio_device *vdev)
 /* Transport interface */
 
 /* the notify function used when creating a virt queue */
-static void vm_notify(struct virtqueue *vq)
+static bool vm_notify(struct virtqueue *vq)
 {
 	struct virtio_mmio_device *vm_dev = to_virtio_mmio_device(vq->vdev);
 
 	/* We write the queue's selector into the notification register to
 	 * signal the other end */
 	writel(vq->index, vm_dev->base + VIRTIO_MMIO_QUEUE_NOTIFY);
+	return true;
 }
 
 /* Notify all virtqueues on an interrupt. */
@@ -469,7 +470,7 @@ static int virtio_mmio_probe(struct platform_device *pdev)
 
 	/* Check magic value */
 	magic = readl(vm_dev->base + VIRTIO_MMIO_MAGIC_VALUE);
-	if (memcmp(&magic, "virt", 4) != 0) {
+	if (magic != ('v' | 'i' << 8 | 'r' << 16 | 't' << 24)) {
 		dev_warn(&pdev->dev, "Wrong magic value 0x%08lx!\n", magic);
 		return -ENODEV;
 	}
@@ -642,7 +643,6 @@ static const struct acpi_device_id virtio_mmio_acpi_match[] = {
 };
 MODULE_DEVICE_TABLE(acpi, virtio_mmio_acpi_match);
 #endif
-
 
 static struct platform_driver virtio_mmio_driver = {
 	.probe		= virtio_mmio_probe,

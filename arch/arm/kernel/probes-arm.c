@@ -19,7 +19,6 @@
 #include <linux/kernel.h>
 
 #include "probes.h"
-#include "asm/probes.h"
 #include "probes-arm.h"
 
 #define sign_extend(x, signbit) ((x) | (0 - ((x) & (1 << (signbit)))))
@@ -56,11 +55,10 @@
  * read and write of flags.
  */
 
-void __kprobes simulate_bbl(probes_opcode_t opcode, probes_opcode_t *addr,
-		struct arch_specific_insn *asi, struct pt_regs *regs)
+void __kprobes simulate_bbl(probes_opcode_t insn,
+		struct arch_probes_insn *asi, struct pt_regs *regs)
 {
-	probes_opcode_t insn = opcode;
-	long iaddr = (long) addr;
+	long iaddr = (long) regs->ARM_pc - 4;
 	int disp  = branch_displacement(insn);
 
 	if (insn & (1 << 24))
@@ -69,11 +67,10 @@ void __kprobes simulate_bbl(probes_opcode_t opcode, probes_opcode_t *addr,
 	regs->ARM_pc = iaddr + 8 + disp;
 }
 
-void __kprobes simulate_blx1(probes_opcode_t opcode, probes_opcode_t *addr,
-		struct arch_specific_insn *asi, struct pt_regs *regs)
+void __kprobes simulate_blx1(probes_opcode_t insn,
+		struct arch_probes_insn *asi, struct pt_regs *regs)
 {
-	probes_opcode_t insn = opcode;
-	long iaddr = (long) addr;
+	long iaddr = (long) regs->ARM_pc - 4;
 	int disp = branch_displacement(insn);
 
 	regs->ARM_lr = iaddr + 4;
@@ -81,15 +78,14 @@ void __kprobes simulate_blx1(probes_opcode_t opcode, probes_opcode_t *addr,
 	regs->ARM_cpsr |= PSR_T_BIT;
 }
 
-void __kprobes simulate_blx2bx(probes_opcode_t opcode, probes_opcode_t *addr,
-		struct arch_specific_insn *asi, struct pt_regs *regs)
+void __kprobes simulate_blx2bx(probes_opcode_t insn,
+		struct arch_probes_insn *asi, struct pt_regs *regs)
 {
-	probes_opcode_t insn = opcode;
 	int rm = insn & 0xf;
 	long rmv = regs->uregs[rm];
 
 	if (insn & (1 << 5))
-		regs->ARM_lr = (long) addr + 4;
+		regs->ARM_lr = (long) regs->ARM_pc;
 
 	regs->ARM_pc = rmv & ~0x1;
 	regs->ARM_cpsr &= ~PSR_T_BIT;
@@ -97,17 +93,16 @@ void __kprobes simulate_blx2bx(probes_opcode_t opcode, probes_opcode_t *addr,
 		regs->ARM_cpsr |= PSR_T_BIT;
 }
 
-void __kprobes simulate_mrs(probes_opcode_t opcode, probes_opcode_t *addr,
-		struct arch_specific_insn *asi, struct pt_regs *regs)
+void __kprobes simulate_mrs(probes_opcode_t insn,
+		struct arch_probes_insn *asi, struct pt_regs *regs)
 {
-	probes_opcode_t insn = opcode;
 	int rd = (insn >> 12) & 0xf;
 	unsigned long mask = 0xf8ff03df; /* Mask out execution state */
 	regs->uregs[rd] = regs->ARM_cpsr & mask;
 }
 
-void __kprobes simulate_mov_ipsp(probes_opcode_t opcode, probes_opcode_t *addr,
-		struct arch_specific_insn *asi, struct pt_regs *regs)
+void __kprobes simulate_mov_ipsp(probes_opcode_t insn,
+		struct arch_probes_insn *asi, struct pt_regs *regs)
 {
 	regs->uregs[12] = regs->uregs[13];
 }
@@ -707,12 +702,11 @@ const union decode_item probes_decode_arm_table[] = {
 EXPORT_SYMBOL_GPL(probes_decode_arm_table);
 #endif
 
-static void __kprobes arm_singlestep(probes_opcode_t opcode,
-		probes_opcode_t *addr, struct arch_specific_insn *asi,
-		struct pt_regs *regs)
+static void __kprobes arm_singlestep(probes_opcode_t insn,
+		struct arch_probes_insn *asi, struct pt_regs *regs)
 {
 	regs->ARM_pc += 4;
-	asi->insn_handler(opcode, addr, asi, regs);
+	asi->insn_handler(insn, asi, regs);
 }
 
 /* Return:
@@ -728,15 +722,11 @@ static void __kprobes arm_singlestep(probes_opcode_t opcode,
  *   should also be very rare.
  */
 enum probes_insn __kprobes
-arm_probes_decode_insn(probes_opcode_t insn, struct arch_specific_insn *asi,
-		bool usermode, const union decode_item *actions)
+arm_probes_decode_insn(probes_opcode_t insn, struct arch_probes_insn *asi,
+		       bool emulate, const union decode_action *actions)
 {
 	asi->insn_singlestep = arm_singlestep;
 	asi->insn_check_cc = probes_condition_checks[insn>>28];
 	return probes_decode_insn(insn, asi, probes_decode_arm_table, false,
-			usermode, actions);
+				  emulate, actions);
 }
-
-#ifdef CONFIG_ARM_KPROBES_TEST_MODULE
-EXPORT_SYMBOL_GPL(probes_decode_arm_table);
-#endif

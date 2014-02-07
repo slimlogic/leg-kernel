@@ -13,29 +13,18 @@
  *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  *  GNU General Public License for more details.
  *
- *  You should have received a copy of the GNU General Public License
- *  along with this program; if not, write to the Free Software
- *  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
- *
  * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
  */
 
-#ifndef _ASM_ARM_ACPI_H
-#define _ASM_ARM_ACPI_H
-
-#ifdef __KERNEL__
-
-#include <acpi/pdc_arm64.h>
+#ifndef _ASM_ARM64_ACPI_H
+#define _ASM_ARM64_ACPI_H
 
 #include <asm/cacheflush.h>
 
 #include <linux/init.h>
 
-#define COMPILER_DEPENDENT_INT64	long long
-#define COMPILER_DEPENDENT_UINT64	unsigned long long
-
-#define MAX_LOCAL_APIC 256
-#define MAX_IO_APICS 64
+#define COMPILER_DEPENDENT_INT64	s64
+#define COMPILER_DEPENDENT_UINT64	u64
 
 /*
  * Calling conventions:
@@ -51,14 +40,7 @@
 #define ACPI_INTERNAL_VAR_XFACE
 
 /* Asm macros */
-#define ACPI_ASM_MACROS
-#define BREAKPOINT3
-#define ACPI_DISABLE_IRQS() local_irq_disable()
-#define ACPI_ENABLE_IRQS()  local_irq_enable()
 #define ACPI_FLUSH_CPU_CACHE() flush_cache_all()
-
-/* Blob handling macros */
-#define	ACPI_BLOB_HEADER_SIZE	8
 
 /* Basic configuration for ACPI */
 #ifdef	CONFIG_ACPI
@@ -66,28 +48,6 @@ extern int acpi_disabled;
 extern int acpi_noirq;
 extern int acpi_pci_disabled;
 extern int acpi_strict;
-
-/* map logic cpu id to physical APIC id
- * APIC = GIC cpu interface on ARM
- */
-extern volatile int arm_cpu_to_apicid[NR_CPUS];
-extern int boot_cpu_apic_id;
-#define cpu_physical_id(cpu) arm_cpu_to_apicid[cpu]
-
-struct acpi_arm_root {
-	phys_addr_t phys_address;
-	unsigned long size;
-};
-extern struct acpi_arm_root acpi_arm_rsdp_info;
-
-void arm_acpi_reserve_memory(void);
-
-/* Low-level suspend routine. */
-extern int (*acpi_suspend_lowlevel)(void);
-
-extern void prefill_possible_map(void);
-
-#define acpi_wakeup_address (0)
 
 static inline void disable_acpi(void)
 {
@@ -98,13 +58,12 @@ static inline void disable_acpi(void)
 
 static inline bool arch_has_acpi_pdc(void)
 {
-	/* BOZO: replace x86 specific-ness here */
-	return 0;	/* always false for now */
+	return false;	/* always false for now */
 }
 
 static inline void arch_acpi_set_pdc_bits(u32 *buf)
 {
-	/* BOZO: replace x86 specific-ness here */
+	return;
 }
 
 static inline void acpi_noirq_set(void) { acpi_noirq = 1; }
@@ -114,13 +73,40 @@ static inline void acpi_disable_pci(void)
 	acpi_noirq_set();
 }
 
+/* FIXME: this function should be moved to topology.h when it's ready */
+void arch_fix_phys_package_id(int num, u32 slot);
+
+/* Low-level suspend routine. */
+extern int (*acpi_suspend_lowlevel)(void);
+#define acpi_wakeup_address (0)
+
+#define MAX_GIC_CPU_INTERFACE 256
+#define MAX_GIC_DISTRIBUTOR   1		/* should be the same as MAX_GIC_NR */
+
+/* map logic cpu id to physical GIC id */
+extern int arm_cpu_to_apicid[NR_CPUS];
+#define cpu_physical_id(cpu) arm_cpu_to_apicid[cpu]
+
+extern const char *acpi_get_enable_method(int cpu);
+
+extern int acpi_get_cpu_release_address(int cpu, u64 *release_address);
+
 #else	/* !CONFIG_ACPI */
 #define acpi_disabled 1		/* ACPI sometimes enabled on ARM */
 #define acpi_noirq 1		/* ACPI sometimes enabled on ARM */
 #define acpi_pci_disabled 1	/* ACPI PCI sometimes enabled on ARM */
 #define acpi_strict 1		/* no ACPI spec workarounds on ARM */
+
+static inline const char *acpi_get_enable_method(int cpu)
+{
+	return NULL;
+}
+
+static inline int acpi_get_cpu_release_address(int cpu, u64 *release_address)
+{
+	return -ENODEV;
+}
+
 #endif
 
-#endif /*__KERNEL__*/
-
-#endif /*_ASM_ARM_ACPI_H*/
+#endif /*_ASM_ARM64_ACPI_H*/

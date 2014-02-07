@@ -50,7 +50,7 @@ optional_header:
 extra_header_fields:
 	.long	0				@ ImageBase
 	.long	0x20				@ SectionAlignment
-	.long	0x20				@ FileAlignment
+	.long	0x8				@ FileAlignment
 	.short	0				@ MajorOperatingSystemVersion
 	.short	0				@ MinorOperatingSystemVersion
 	.short	0				@ MajorImageVersion
@@ -71,8 +71,14 @@ extra_header_fields:
 	.long	0				@ SizeOfHeapReserve
 	.long	0				@ SizeOfHeapCommit
 	.long	0				@ LoaderFlags
-	.long	0x0				@ NumberOfRvaAndSizes
+	.long	0x6				@ NumberOfRvaAndSizes
 
+	.quad   0                               @ ExportTable
+	.quad   0                               @ ImportTable
+	.quad   0                               @ ResourceTable
+	.quad   0                               @ ExceptionTable
+	.quad   0                               @ CertificationTable
+	.quad   0                               @ BaseRelocationTable
 	# Section table
 section_table:
 

@@ -4,13 +4,33 @@
  * implementation files.
  *
  * Copyright 2011 Intel Corporation; author Matt Fleming
- * Copyright 2013 Linaro Limited; author Roy Franz
  *
  * This file is part of the Linux kernel, and is made available
  * under the terms of the GNU General Public License version 2.
  *
  */
 #define EFI_READ_CHUNK_SIZE	(1024 * 1024)
+
+/* error code which can't be mistaken for valid address */
+#define EFI_ERROR	(~0UL)
+
+# if !defined(CONFIG_X86)
+/*
+ * EFI function call wrappers. These are not required for arm/arm64, but
+ * wrappers are required for X86 to convert between ABIs. These wrappers are
+ * provided to allow code sharing between X86 and other architectures. Since
+ * these wrappers directly invoke the EFI function pointer, the function
+ * pointer type must be properly defined, which is not the case for X86. One
+ * advantage of this is it allows for type checking of arguments, which is not
+ * possible with the X86 wrappers.
+ */
+#define efi_call_phys0(f)			f()
+#define efi_call_phys1(f, a1)			f(a1)
+#define efi_call_phys2(f, a1, a2)		f(a1, a2)
+#define efi_call_phys3(f, a1, a2, a3)		f(a1, a2, a3)
+#define efi_call_phys4(f, a1, a2, a3, a4)	f(a1, a2, a3, a4)
+#define efi_call_phys5(f, a1, a2, a3, a4, a5)	f(a1, a2, a3, a4, a5)
+#endif
 
 struct file_info {
 	efi_file_handle_t *handle;
@@ -45,6 +65,9 @@ static void efi_printk(efi_system_table_t *sys_table_arg, char *str)
 		efi_char16_printk(sys_table_arg, ch);
 	}
 }
+
+#define pr_efi(sys_table, msg)     efi_printk(sys_table, "EFI stub: "msg)
+#define pr_efi_err(sys_table, msg) efi_printk(sys_table, "EFI stub: ERROR: "msg)
 
 
 static efi_status_t efi_get_memory_map(efi_system_table_t *sys_table_arg,
@@ -88,6 +111,32 @@ again:
 fail:
 	*map = m;
 	return status;
+}
+
+
+static unsigned long __init get_dram_base(efi_system_table_t *sys_table)
+{
+	efi_status_t status;
+	unsigned long map_size;
+	unsigned long membase  = EFI_ERROR;
+	struct efi_memory_map map;
+	efi_memory_desc_t *md;
+
+	status = efi_get_memory_map(sys_table, (efi_memory_desc_t **)&map.map,
+				    &map_size, &map.desc_size, NULL, NULL);
+	if (status != EFI_SUCCESS)
+		return membase;
+
+	map.map_end = map.map + map_size;
+
+	for_each_efi_memory_desc(&map, md)
+		if (md->attribute & EFI_MEMORY_WB)
+			if (membase > md->phys_addr)
+				membase = md->phys_addr;
+
+	efi_call_phys1(sys_table->boottime->free_pool, map.map);
+
+	return membase;
 }
 
 /*
@@ -325,7 +374,7 @@ static efi_status_t handle_cmdline_files(efi_system_table_t *sys_table_arg,
 				nr_files * sizeof(*files),
 				(void **)&files);
 	if (status != EFI_SUCCESS) {
-		efi_printk(sys_table_arg, "Failed to alloc mem for file handle list\n");
+		pr_efi_err(sys_table_arg, "Failed to alloc mem for file handle list\n");
 		goto fail;
 	}
 
@@ -377,13 +426,13 @@ static efi_status_t handle_cmdline_files(efi_system_table_t *sys_table_arg,
 					image->device_handle, &fs_proto,
 						(void **)&io);
 			if (status != EFI_SUCCESS) {
-				efi_printk(sys_table_arg, "Failed to handle fs_proto\n");
+				pr_efi_err(sys_table_arg, "Failed to handle fs_proto\n");
 				goto free_files;
 			}
 
 			status = efi_call_phys2(io->open_volume, io, &fh);
 			if (status != EFI_SUCCESS) {
-				efi_printk(sys_table_arg, "Failed to open volume\n");
+				pr_efi_err(sys_table_arg, "Failed to open volume\n");
 				goto free_files;
 			}
 		}
@@ -391,7 +440,7 @@ static efi_status_t handle_cmdline_files(efi_system_table_t *sys_table_arg,
 		status = efi_call_phys5(fh->open, fh, &h, filename_16,
 					EFI_FILE_MODE_READ, (u64)0);
 		if (status != EFI_SUCCESS) {
-			efi_printk(sys_table_arg, "Failed to open file: ");
+			pr_efi_err(sys_table_arg, "Failed to open file: ");
 			efi_char16_printk(sys_table_arg, filename_16);
 			efi_printk(sys_table_arg, "\n");
 			goto close_handles;
@@ -403,7 +452,7 @@ static efi_status_t handle_cmdline_files(efi_system_table_t *sys_table_arg,
 		status = efi_call_phys4(h->get_info, h, &info_guid,
 					&info_sz, NULL);
 		if (status != EFI_BUFFER_TOO_SMALL) {
-			efi_printk(sys_table_arg, "Failed to get file info size\n");
+			pr_efi_err(sys_table_arg, "Failed to get file info size\n");
 			goto close_handles;
 		}
 
@@ -412,7 +461,7 @@ grow:
 					EFI_LOADER_DATA, info_sz,
 					(void **)&info);
 		if (status != EFI_SUCCESS) {
-			efi_printk(sys_table_arg, "Failed to alloc mem for file info\n");
+			pr_efi_err(sys_table_arg, "Failed to alloc mem for file info\n");
 			goto close_handles;
 		}
 
@@ -428,7 +477,7 @@ grow:
 		efi_call_phys1(sys_table_arg->boottime->free_pool, info);
 
 		if (status != EFI_SUCCESS) {
-			efi_printk(sys_table_arg, "Failed to get file info\n");
+			pr_efi_err(sys_table_arg, "Failed to get file info\n");
 			goto close_handles;
 		}
 
@@ -447,13 +496,13 @@ grow:
 		status = efi_high_alloc(sys_table_arg, file_size_total, 0x1000,
 				    &file_addr, max_addr);
 		if (status != EFI_SUCCESS) {
-			efi_printk(sys_table_arg, "Failed to alloc highmem for files\n");
+			pr_efi_err(sys_table_arg, "Failed to alloc highmem for files\n");
 			goto close_handles;
 		}
 
 		/* We've run out of free low memory. */
 		if (file_addr > max_addr) {
-			efi_printk(sys_table_arg, "We've run out of free low memory\n");
+			pr_efi_err(sys_table_arg, "We've run out of free low memory\n");
 			status = EFI_INVALID_PARAMETER;
 			goto free_file_total;
 		}
@@ -474,7 +523,7 @@ grow:
 							&chunksize,
 							(void *)addr);
 				if (status != EFI_SUCCESS) {
-					efi_printk(sys_table_arg, "Failed to read file\n");
+					pr_efi_err(sys_table_arg, "Failed to read file\n");
 					goto free_file_total;
 				}
 				addr += chunksize;
@@ -559,7 +608,7 @@ static efi_status_t efi_relocate_kernel(efi_system_table_t *sys_table_arg,
 				       &new_addr);
 	}
 	if (status != EFI_SUCCESS) {
-		efi_printk(sys_table_arg, "ERROR: Failed to allocate usable memory for kernel.\n");
+		pr_efi_err(sys_table_arg, "ERROR: Failed to allocate usable memory for kernel.\n");
 		return status;
 	}
 
@@ -568,8 +617,6 @@ static efi_status_t efi_relocate_kernel(efi_system_table_t *sys_table_arg,
 	 * have been allocated by UEFI, so we can safely use memcpy.
 	 */
 	memcpy((void *)new_addr, (void *)cur_image_addr, image_size);
-	/* Zero any extra space we may have allocated for BSS. */
-	memset((void *)(new_addr + image_size), alloc_size - image_size, 0);
 
 	/* Return the new address of the relocated image. */
 	*image_addr = new_addr;
@@ -578,147 +625,123 @@ static efi_status_t efi_relocate_kernel(efi_system_table_t *sys_table_arg,
 }
 
 /*
- * Convert the unicode UEFI command line to ASCII to pass to kernel.
+ * Get the number of UTF-8 bytes corresponding to an UTF-16 character.
+ * This overestimates for surrogates, but that is okay.
+ */
+static int efi_utf8_bytes(u16 c)
+{
+	return 1 + (c >= 0x80) + (c >= 0x800);
+}
+
+/*
+ * Convert an UTF-16 string, not necessarily null terminated, to UTF-8.
+ */
+static u8 *efi_utf16_to_utf8(u8 *dst, const u16 *src, int n)
+{
+	unsigned int c;
+
+	while (n--) {
+		c = *src++;
+		if (n && c >= 0xd800 && c <= 0xdbff &&
+		    *src >= 0xdc00 && *src <= 0xdfff) {
+			c = 0x10000 + ((c & 0x3ff) << 10) + (*src & 0x3ff);
+			src++;
+			n--;
+		}
+		if (c >= 0xd800 && c <= 0xdfff)
+			c = 0xfffd; /* Unmatched surrogate */
+		if (c < 0x80) {
+			*dst++ = c;
+			continue;
+		}
+		if (c < 0x800) {
+			*dst++ = 0xc0 + (c >> 6);
+			goto t1;
+		}
+		if (c < 0x10000) {
+			*dst++ = 0xe0 + (c >> 12);
+			goto t2;
+		}
+		*dst++ = 0xf0 + (c >> 18);
+		*dst++ = 0x80 + ((c >> 12) & 0x3f);
+t2:
+		*dst++ = 0x80 + ((c >> 6) & 0x3f);
+t1:
+		*dst++ = 0x80 + (c & 0x3f);
+	}
+
+	return dst;
+}
+
+/*
+ * Do proper conversion from UTF-16 to UTF-8
  * Size of memory allocated return in *cmd_line_len.
  * Returns NULL on error.
  */
-static char *efi_convert_cmdline_to_ascii(efi_system_table_t *sys_table_arg,
-				      efi_loaded_image_t *image,
-				      int *cmd_line_len)
+static char *efi_convert_cmdline(efi_system_table_t *sys_table_arg,
+				 efi_loaded_image_t *image,
+				 int *cmd_line_len)
 {
-	u16 *s2;
+	const u16 *s2;
 	u8 *s1 = NULL;
 	unsigned long cmdline_addr = 0;
-	int load_options_size = image->load_options_size / 2; /* ASCII */
-	void *options = image->load_options;
-	int options_size = 0;
+	int load_options_chars = image->load_options_size / 2; /* UTF-16 */
+	const u16 *options = image->load_options;
+	int options_bytes = 0;	/* UTF-8 bytes */
+	int options_chars = 0;	/* UTF-16 chars */
 	efi_status_t status;
-	int i;
 	u16 zero = 0;
 
 	if (options) {
 		s2 = options;
-		while (*s2 && *s2 != '\n' && options_size < load_options_size) {
-			s2++;
-			options_size++;
+		while (options_chars < load_options_chars
+		       && *s2 && *s2 != '\n') {
+			options_bytes += efi_utf8_bytes(*s2++);
+			options_chars++;
 		}
 	}
 
-	if (options_size == 0) {
-		/* No command line options, so return empty string*/
-		options_size = 1;
+	if (!options_chars) {
+		/* No command line options, so return empty string */
 		options = &zero;
 	}
 
-	options_size++;  /* NUL termination */
-#ifdef CONFIG_ARM
-	/*
-	 * For ARM, allocate at a high address to avoid reserved
-	 * regions at low addresses that we don't know the specfics of
-	 * at the time we are processing the command line.
-	 */
-	status = efi_high_alloc(sys_table_arg, options_size, 0,
-			    &cmdline_addr, 0xfffff000);
-#else
-	status = efi_low_alloc(sys_table_arg, options_size, 0,
-			    &cmdline_addr);
-#endif
+	options_bytes++;	/* NUL termination */
+
+	status = efi_low_alloc(sys_table_arg, options_bytes, 0, &cmdline_addr);
 	if (status != EFI_SUCCESS)
 		return NULL;
 
 	s1 = (u8 *)cmdline_addr;
-	s2 = (u16 *)options;
+	s2 = (const u16 *)options;
 
-	for (i = 0; i < options_size - 1; i++)
-		*s1++ = *s2++;
-
+	s1 = efi_utf16_to_utf8(s1, s2, options_chars);
 	*s1 = '\0';
 
-	*cmd_line_len = options_size;
+	*cmd_line_len = options_bytes;
 	return (char *)cmdline_addr;
 }
 
-#if defined(CONFIG_ARM) || defined(CONFIG_ARM64)
-static efi_status_t update_fdt(efi_system_table_t *sys_table, void *orig_fdt,
-			       void *fdt, int new_fdt_size, char *cmdline_ptr,
-			       u64 initrd_addr, u64 initrd_size,
-			       efi_memory_desc_t *memory_map,
-			       unsigned long map_size, unsigned long desc_size,
-			       u32 desc_ver)
+static int __init efi_secureboot_enabled(efi_system_table_t *sys_table_arg)
 {
-	int node;
-	int status;
-	u32 fdt_val32;
-	u64 fdt_val64;
+	static efi_guid_t const var_guid __initconst = EFI_GLOBAL_VARIABLE_GUID;
+	static efi_char16_t const var_name[] __initconst = {
+		'S', 'e', 'c', 'u', 'r', 'e', 'B', 'o', 'o', 't', 0 };
 
-	status = fdt_open_into(orig_fdt, fdt, new_fdt_size);
-	if (status != 0)
-		goto fdt_set_fail;
+	efi_get_variable_t *f_getvar = sys_table_arg->runtime->get_variable;
+	unsigned long size = sizeof(u8);
+	efi_status_t status;
+	u8 val;
 
-	node = fdt_subnode_offset(fdt, 0, "chosen");
-	if (node < 0) {
-		node = fdt_add_subnode(fdt, 0, "chosen");
-		if (node < 0) {
-			status = node; /* node is error code when negative */
-			goto fdt_set_fail;
-		}
+	status = efi_call_phys5(f_getvar, (efi_char16_t *)var_name,
+				(efi_guid_t *)&var_guid, NULL, &size, &val);
+
+	switch (status) {
+	case EFI_SUCCESS:
+		return val;
+	case EFI_NOT_FOUND:
+		return 0;
+	default:
+		return 1;
 	}
-
-	if ((cmdline_ptr != NULL) && (strlen(cmdline_ptr) > 0)) {
-		status = fdt_setprop(fdt, node, "bootargs", cmdline_ptr,
-				     strlen(cmdline_ptr) + 1);
-		if (status)
-			goto fdt_set_fail;
-	}
-
-	/* Set intird address/end in device tree, if present */
-	if (initrd_size != 0) {
-		u64 initrd_image_end;
-		u64 initrd_image_start = cpu_to_fdt64(initrd_addr);
-		status = fdt_setprop(fdt, node, "linux,initrd-start",
-				     &initrd_image_start, sizeof(u64));
-		if (status)
-			goto fdt_set_fail;
-		initrd_image_end = cpu_to_fdt64(initrd_addr + initrd_size);
-		status = fdt_setprop(fdt, node, "linux,initrd-end",
-				     &initrd_image_end, sizeof(u64));
-		if (status)
-			goto fdt_set_fail;
-	}
-
-	/* Add FDT entries for EFI runtime services in chosen node. */
-	node = fdt_subnode_offset(fdt, 0, "chosen");
-	fdt_val64 = cpu_to_fdt64((u64)(unsigned long)sys_table);
-	status = fdt_setprop(fdt, node, "linux,efi-system-table",
-			     &fdt_val64, sizeof(fdt_val64));
-	if (status)
-		goto fdt_set_fail;
-
-	fdt_val32 = cpu_to_fdt32(desc_size);
-	status = fdt_setprop(fdt, node, "linux,efi-mmap-desc-size",
-			     &fdt_val32, sizeof(fdt_val32));
-	if (status)
-		goto fdt_set_fail;
-
-	fdt_val32 = cpu_to_fdt32(desc_ver);
-	status = fdt_setprop(fdt, node, "linux,efi-mmap-desc-version",
-			     &fdt_val32, sizeof(fdt_val32));
-	if (status)
-		goto fdt_set_fail;
-
-
-	/* Stuff the whole memory map into FDT */
-	status = fdt_setprop(fdt, node, "linux,efi-mmap",
-			     memory_map, map_size);
-	if (status)
-		goto fdt_set_fail;
-
-	return EFI_SUCCESS;
-
-fdt_set_fail:
-	if (status == -FDT_ERR_NOSPACE)
-		return EFI_BUFFER_TOO_SMALL;
-
-	return EFI_LOAD_ERROR;
 }
-#endif

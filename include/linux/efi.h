@@ -394,6 +394,9 @@ typedef efi_status_t efi_query_variable_store_t(u32 attributes, unsigned long si
 #define EFI_FILE_SYSTEM_GUID \
     EFI_GUID(  0x964e5b22, 0x6459, 0x11d2, 0x8e, 0x39, 0x00, 0xa0, 0xc9, 0x69, 0x72, 0x3b )
 
+#define EFI_DEVICE_TREE_GUID \
+    EFI_GUID(  0xb1b621d5, 0xf19c, 0x41a5, 0x83, 0x0b, 0xd9, 0x15, 0x2c, 0x69, 0xaa, 0xe0 )
+
 typedef struct {
 	efi_guid_t guid;
 	u64 table;
@@ -483,6 +486,14 @@ struct efi_memory_map {
 	unsigned long desc_size;
 };
 
+struct efi_fdt_params {
+	u64 system_table;
+	u64 mmap;
+	u32 mmap_size;
+	u32 desc_size;
+	u32 desc_ver;
+};
+
 typedef struct {
 	u32 revision;
 	void *parent_handle;
@@ -556,6 +567,9 @@ extern struct efi {
 	unsigned long hcdp;		/* HCDP table */
 	unsigned long uga;		/* UGA table */
 	unsigned long uv_systab;	/* UV system table */
+	unsigned long fw_vendor;	/* fw_vendor */
+	unsigned long runtime;		/* runtime table */
+	unsigned long config_table;	/* config tables */
 	efi_get_time_t *get_time;
 	efi_set_time_t *set_time;
 	efi_get_wakeup_time_t *get_wakeup_time;
@@ -570,6 +584,7 @@ extern struct efi {
 	efi_reset_system_t *reset_system;
 	efi_set_virtual_address_map_t *set_virtual_address_map;
 	struct efi_memory_map *memmap;
+	unsigned long flags;
 } efi;
 
 static inline int
@@ -616,7 +631,14 @@ extern void efi_initialize_iomem_resources(struct resource *code_resource,
 extern void efi_get_time(struct timespec *now);
 extern int efi_set_rtc_mmss(const struct timespec *now);
 extern void efi_reserve_boot_services(void);
+extern int efi_get_fdt_params(struct efi_fdt_params *params, int verbose);
 extern struct efi_memory_map memmap;
+
+/* Iterate through an efi_memory_map */
+#define for_each_efi_memory_desc(m, md)					   \
+	for ((md) = (m)->map;						   \
+	     (md) <= (efi_memory_desc_t *)((m)->map_end - (m)->desc_size); \
+	     (md) = (void *)(md) + (m)->desc_size)
 
 /**
  * efi_range_is_wc - check the WC bit on an address range
@@ -653,20 +675,20 @@ extern int __init efi_setup_pcdp_console(char *);
 #define EFI_RUNTIME_SERVICES	3	/* Can we use runtime services? */
 #define EFI_MEMMAP		4	/* Can we use EFI memory map? */
 #define EFI_64BIT		5	/* Is the firmware 64-bit? */
+#define EFI_ARCH_1		6	/* First arch-specific bit */
 
 #ifdef CONFIG_EFI
-# if defined(CONFIG_X86) || defined(CONFIG_ARM) || defined(CONFIG_ARM64)
-extern int efi_enabled(int facility);
-# else
-static inline int efi_enabled(int facility)
+/*
+ * Test whether the above EFI_* bits are enabled.
+ */
+static inline bool efi_enabled(int feature)
 {
-	return 1;
+	return test_bit(feature, &efi.flags) != 0;
 }
-# endif
 #else
-static inline int efi_enabled(int facility)
+static inline bool efi_enabled(int feature)
 {
-	return 0;
+	return false;
 }
 #endif
 
@@ -801,6 +823,15 @@ struct efivar_entry {
 	struct efi_variable var;
 	struct list_head list;
 	struct kobject kobj;
+	bool scanning;
+	bool deleting;
+};
+
+
+struct efi_simple_text_output_protocol {
+	void *reset;
+	efi_status_t (*output_string)(void *, void *);
+	void *test_string;
 };
 
 
@@ -866,6 +897,21 @@ void efivar_run_worker(void);
 #if defined(CONFIG_EFI_VARS) || defined(CONFIG_EFI_VARS_MODULE)
 int efivars_sysfs_init(void);
 
+#define EFIVARS_DATA_SIZE_MAX 1024
+
 #endif /* CONFIG_EFI_VARS */
+
+#ifdef CONFIG_EFI_RUNTIME_MAP
+int efi_runtime_map_init(struct kobject *);
+void efi_runtime_map_setup(void *, int, u32);
+#else
+static inline int efi_runtime_map_init(struct kobject *kobj)
+{
+	return 0;
+}
+
+static inline void
+efi_runtime_map_setup(void *map, int nr_entries, u32 desc_size) {}
+#endif
 
 #endif /* _LINUX_EFI_H */

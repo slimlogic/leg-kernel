@@ -1,3 +1,11 @@
+/*
+ * Copyright (C) 2012 Rabin Vincent <rabin at rab.in>
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
+ */
+
 #include <linux/kernel.h>
 #include <linux/wait.h>
 #include <linux/uprobes.h>
@@ -7,9 +15,9 @@
 #include "probes-arm.h"
 #include "uprobes.h"
 
-static int uprobes_substitute_pc(probes_opcode_t *pinsn, u32 oregs)
+static int uprobes_substitute_pc(unsigned long *pinsn, u32 oregs)
 {
-	probes_opcode_t insn = *pinsn;
+	probes_opcode_t insn = __mem_to_opcode_arm(*pinsn);
 	probes_opcode_t temp;
 	probes_opcode_t mask;
 	int freereg;
@@ -36,8 +44,8 @@ static int uprobes_substitute_pc(probes_opcode_t *pinsn, u32 oregs)
 	 */
 	freereg = free = fls(free) - 1;
 
-	temp = *pinsn;
-	insn = *pinsn;
+	temp = __mem_to_opcode_arm(*pinsn);
+	insn = temp;
 	regs = oregs;
 	mask = 0xf;
 
@@ -52,7 +60,7 @@ static int uprobes_substitute_pc(probes_opcode_t *pinsn, u32 oregs)
 		insn |= free & mask;
 	}
 
-	*pinsn = insn;
+	*pinsn = __opcode_to_mem_arm(insn);
 	return freereg;
 }
 
@@ -95,7 +103,8 @@ static void uprobe_write_pc(struct arch_uprobe *auprobe,
 }
 
 enum probes_insn
-decode_pc_ro(probes_opcode_t insn, struct arch_specific_insn *asi, struct decode_header *d)
+decode_pc_ro(probes_opcode_t insn, struct arch_probes_insn *asi,
+	     struct decode_header *d)
 {
 	struct arch_uprobe *auprobe = container_of(asi, struct arch_uprobe,
 						   asi);
@@ -103,7 +112,7 @@ decode_pc_ro(probes_opcode_t insn, struct arch_specific_insn *asi, struct decode
 	u32 regs = decode->header.type_regs.bits >> DECODE_TYPE_BITS;
 	int reg;
 
-	reg = uprobes_substitute_pc(&auprobe->modinsn, regs);
+	reg = uprobes_substitute_pc(&auprobe->ixol[0], regs);
 	if (reg == 15)
 		return INSN_GOOD;
 
@@ -118,7 +127,7 @@ decode_pc_ro(probes_opcode_t insn, struct arch_specific_insn *asi, struct decode
 }
 
 enum probes_insn
-decode_wb_pc(probes_opcode_t insn, struct arch_specific_insn *asi,
+decode_wb_pc(probes_opcode_t insn, struct arch_probes_insn *asi,
 	     struct decode_header *d, bool alu)
 {
 	struct arch_uprobe *auprobe = container_of(asi, struct arch_uprobe,
@@ -134,20 +143,22 @@ decode_wb_pc(probes_opcode_t insn, struct arch_specific_insn *asi,
 
 enum probes_insn
 decode_rd12rn16rm0rs8_rwflags(probes_opcode_t insn,
-			      struct arch_specific_insn *asi, struct decode_header *d)
+			      struct arch_probes_insn *asi,
+			      struct decode_header *d)
 {
 	return decode_wb_pc(insn, asi, d, true);
 }
 
 enum probes_insn
-decode_ldr(probes_opcode_t insn, struct arch_specific_insn *asi, struct decode_header *d)
+decode_ldr(probes_opcode_t insn, struct arch_probes_insn *asi,
+	   struct decode_header *d)
 {
 	return decode_wb_pc(insn, asi, d, false);
 }
 
 enum probes_insn
 uprobe_decode_ldmstm(probes_opcode_t insn,
-		     struct arch_specific_insn *asi, struct decode_header *d)
+		     struct arch_probes_insn *asi, struct decode_header *d)
 {
 	struct arch_uprobe *auprobe = container_of(asi, struct arch_uprobe,
 						   asi);
@@ -169,7 +180,7 @@ uprobe_decode_ldmstm(probes_opcode_t insn,
 	insn ^= 0xc000;
 
 	auprobe->pcreg = 14;
-	auprobe->modinsn = insn;
+	auprobe->ixol[0] = __opcode_to_mem_arm(insn);
 
 	auprobe->prehandler = uprobe_set_pc;
 	if (lbit)
@@ -180,8 +191,8 @@ uprobe_decode_ldmstm(probes_opcode_t insn,
 	return INSN_GOOD;
 }
 
-const union decode_item uprobes_probes_actions[] = {
-	[PROBES_EMULATE_NONE] {.handler = probes_simulate_nop},
+const union decode_action uprobes_probes_actions[] = {
+	[PROBES_EMULATE_NONE] = {.handler = probes_simulate_nop},
 	[PROBES_SIMULATE_NOP] = {.handler = probes_simulate_nop},
 	[PROBES_PRELOAD_IMM] = {.handler = probes_simulate_nop},
 	[PROBES_PRELOAD_REG] = {.handler = probes_simulate_nop},

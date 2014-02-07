@@ -292,6 +292,8 @@ extern void clocksource_resume(void);
 extern struct clocksource * __init __weak clocksource_default_clock(void);
 extern void clocksource_mark_unstable(struct clocksource *cs);
 
+extern u64
+clocks_calc_max_nsecs(u32 mult, u32 shift, u32 maxadj, u64 mask);
 extern void
 clocks_calc_mult_shift(u32 *mult, u32 *shift, u32 from, u32 to, u32 minsec);
 
@@ -339,6 +341,8 @@ extern int clocksource_i8253_init(void);
 
 struct device_node;
 typedef void(*clocksource_of_init_fn)(struct device_node *);
+typedef void(*clocksource_acpi_init_fn)(void);
+
 #ifdef CONFIG_CLKSRC_OF
 extern void clocksource_of_init(void);
 
@@ -354,6 +358,19 @@ static inline void clocksource_of_init(void) {}
 		__attribute__((unused))					\
 		 = { .compatible = compat,				\
 		     .data = (fn == (clocksource_of_init_fn)NULL) ? fn : fn }
+#endif
+
+#ifdef CONFIG_ACPI
+extern void clocksource_acpi_init(void);
+
+#define CLOCKSOURCE_ACPI_DECLARE(name, compat, fn)			\
+	static const struct acpi_device_id __clksrc_acpi_table_##name	\
+		__used __section(__clksrc_acpi_table)			\
+		 = { .id = compat,				\
+		     .driver_data = (kernel_ulong_t)fn }
+#else
+static inline void clocksource_acpi_init(void) { return; }
+#define CLOCKSOURCE_ACPI_DECLARE(name, compat, fn)
 #endif
 
 #endif /* _LINUX_CLOCKSOURCE_H */

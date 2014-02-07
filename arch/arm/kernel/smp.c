@@ -25,6 +25,7 @@
 #include <linux/clockchips.h>
 #include <linux/completion.h>
 #include <linux/cpufreq.h>
+#include <linux/irq_work.h>
 
 #include <linux/atomic.h>
 #include <asm/smp.h>
@@ -66,7 +67,7 @@ enum ipi_msg_type {
 	IPI_CALL_FUNC,
 	IPI_CALL_FUNC_SINGLE,
 	IPI_CPU_STOP,
-	IPI_CPU_BACKTRACE,
+	IPI_IRQ_WORK,
 	IPI_COMPLETION,
 };
 
@@ -82,7 +83,7 @@ void __init smp_set_ops(struct smp_operations *ops)
 
 static unsigned long get_arch_pgd(pgd_t *pgd)
 {
-	phys_addr_t pgdir = virt_to_phys(pgd);
+	phys_addr_t pgdir = virt_to_idmap(pgd);
 	BUG_ON(pgdir & ARCH_PGD_MASK);
 	return pgdir >> ARCH_PGD_SHIFT;
 }
@@ -104,8 +105,7 @@ int __cpu_up(unsigned int cpu, struct task_struct *idle)
 	secondary_data.pgdir = get_arch_pgd(idmap_pgd);
 	secondary_data.swapper_pg_dir = get_arch_pgd(swapper_pg_dir);
 #endif
-	__cpuc_flush_dcache_area(&secondary_data, sizeof(secondary_data));
-	outer_clean_range(__pa(&secondary_data), __pa(&secondary_data + 1));
+	sync_cache_w(&secondary_data);
 
 	/*
 	 * Now bring the CPU into our world.
@@ -293,6 +293,9 @@ void __ref cpu_die(void)
 	if (smp_ops.cpu_die)
 		smp_ops.cpu_die(cpu);
 
+	pr_warn("CPU%u: smp_ops.cpu_die() returned, trying to resuscitate\n",
+		cpu);
+
 	/*
 	 * Do not return to the idle loop - jump back to the secondary
 	 * cpu initialisation.  There's some initialisation which needs
@@ -450,6 +453,14 @@ void arch_send_call_function_single_ipi(int cpu)
 	smp_cross_call(cpumask_of(cpu), IPI_CALL_FUNC_SINGLE);
 }
 
+#ifdef CONFIG_IRQ_WORK
+void arch_irq_work_raise(void)
+{
+	if (is_smp())
+		smp_cross_call(cpumask_of(smp_processor_id()), IPI_IRQ_WORK);
+}
+#endif
+
 static const char *ipi_types[NR_IPI] = {
 #define S(x,s)	[x] = s
 	S(IPI_WAKEUP, "CPU wakeup interrupts"),
@@ -458,7 +469,7 @@ static const char *ipi_types[NR_IPI] = {
 	S(IPI_CALL_FUNC, "Function call interrupts"),
 	S(IPI_CALL_FUNC_SINGLE, "Single function call interrupts"),
 	S(IPI_CPU_STOP, "CPU stop interrupts"),
-	S(IPI_CPU_BACKTRACE, "CPU backtrace"),
+	S(IPI_IRQ_WORK, "IRQ work interrupts"),
 	S(IPI_COMPLETION, "completion interrupts"),
 };
 
@@ -517,58 +528,6 @@ static void ipi_cpu_stop(unsigned int cpu)
 
 	while (1)
 		cpu_relax();
-}
-
-static cpumask_t backtrace_mask;
-static DEFINE_RAW_SPINLOCK(backtrace_lock);
-
-/* "in progress" flag of arch_trigger_all_cpu_backtrace */
-static unsigned long backtrace_flag;
-
-void smp_send_all_cpu_backtrace(void)
-{
-	unsigned int this_cpu = smp_processor_id();
-	int i;
-
-	if (test_and_set_bit(0, &backtrace_flag))
-		/*
-		 * If there is already a trigger_all_cpu_backtrace() in progress
-		 * (backtrace_flag == 1), don't output double cpu dump infos.
-		 */
-		return;
-
-	cpumask_copy(&backtrace_mask, cpu_online_mask);
-	cpu_clear(this_cpu, backtrace_mask);
-
-	pr_info("Backtrace for cpu %d (current):\n", this_cpu);
-	dump_stack();
-
-	pr_info("\nsending IPI to all other CPUs:\n");
-	smp_cross_call(&backtrace_mask, IPI_CPU_BACKTRACE);
-
-	/* Wait for up to 10 seconds for all other CPUs to do the backtrace */
-	for (i = 0; i < 10 * 1000; i++) {
-		if (cpumask_empty(&backtrace_mask))
-			break;
-		mdelay(1);
-	}
-
-	clear_bit(0, &backtrace_flag);
-	smp_mb__after_clear_bit();
-}
-
-/*
- * ipi_cpu_backtrace - handle IPI from smp_send_all_cpu_backtrace()
- */
-static void ipi_cpu_backtrace(unsigned int cpu, struct pt_regs *regs)
-{
-	if (cpu_isset(cpu, backtrace_mask)) {
-		raw_spin_lock(&backtrace_lock);
-		pr_warning("IPI backtrace for cpu %d\n", cpu);
-		show_regs(regs);
-		raw_spin_unlock(&backtrace_lock);
-		cpu_clear(cpu, backtrace_mask);
-	}
 }
 
 static DEFINE_PER_CPU(struct completion *, cpu_completion);
@@ -634,9 +593,13 @@ void handle_IPI(int ipinr, struct pt_regs *regs)
 		irq_exit();
 		break;
 
-	case IPI_CPU_BACKTRACE:
-		ipi_cpu_backtrace(cpu, regs);
+#ifdef CONFIG_IRQ_WORK
+	case IPI_IRQ_WORK:
+		irq_enter();
+		irq_work_run();
+		irq_exit();
 		break;
+#endif
 
 	case IPI_COMPLETION:
 		irq_enter();

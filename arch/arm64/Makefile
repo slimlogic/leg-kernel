@@ -20,9 +20,15 @@ LIBGCC 		:= $(shell $(CC) $(KBUILD_CFLAGS) -print-libgcc-file-name)
 KBUILD_DEFCONFIG := defconfig
 
 KBUILD_CFLAGS	+= -mgeneral-regs-only
+ifeq ($(CONFIG_CPU_BIG_ENDIAN), y)
+KBUILD_CPPFLAGS	+= -mbig-endian
+AS		+= -EB
+LD		+= -EB
+else
 KBUILD_CPPFLAGS	+= -mlittle-endian
 AS		+= -EL
 LD		+= -EL
+endif
 
 comma = ,
 
@@ -39,7 +45,7 @@ export	TEXT_OFFSET GZFLAGS
 core-y		+= arch/arm64/kernel/ arch/arm64/mm/
 core-$(CONFIG_KVM) += arch/arm64/kvm/
 core-$(CONFIG_XEN) += arch/arm64/xen/
-core-$(findstring y,$(CONFIG_EFI)$(CONFIG_EFI_STUB))	+= arch/arm64/efi/
+drivers-$(CONFIG_PCI)	+= arch/arm64/pci/
 libs-y		:= arch/arm64/lib/ $(libs-y)
 libs-y		+= $(LIBGCC)
 

@@ -48,7 +48,7 @@ static __initdata unsigned long palo_phys;
 
 static __initdata efi_config_table_type_t arch_tables[] = {
 	{PROCESSOR_ABSTRACTION_LAYER_OVERWRITE_GUID, "PALO", &palo_phys},
-	{NULL_GUID, NULL, NULL},
+	{NULL_GUID, NULL, 0},
 };
 
 extern efi_status_t efi_call_phys (void *, ...);
@@ -477,6 +477,9 @@ efi_init (void)
 	char *cp, vendor[100] = "unknown";
 	int i;
 
+	set_bit(EFI_BOOT, &efi.flags);
+	set_bit(EFI_64BIT, &efi.flags);
+
 	/*
 	 * It's too early to be able to use the standard kernel command line
 	 * support...
@@ -528,6 +531,8 @@ efi_init (void)
 	printk(KERN_INFO "EFI v%u.%.02u by %s:",
 	       efi.systab->hdr.revision >> 16,
 	       efi.systab->hdr.revision & 0xffff, vendor);
+
+	set_bit(EFI_SYSTEM_TABLES, &efi.flags);
 
 	palo_phys      = EFI_INVALID_TABLE_ADDR;
 
@@ -656,6 +661,8 @@ efi_enter_virtual_mode (void)
 		       "virtual mode (status=%lu)\n", status);
 		return;
 	}
+
+	set_bit(EFI_RUNTIME_SERVICES, &efi.flags);
 
 	/*
 	 * Now that EFI is in virtual mode, we call the EFI functions more

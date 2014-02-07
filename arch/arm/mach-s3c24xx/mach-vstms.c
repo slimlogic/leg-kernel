@@ -22,6 +22,7 @@
 #include <linux/mtd/nand.h>
 #include <linux/mtd/nand_ecc.h>
 #include <linux/mtd/partitions.h>
+#include <linux/memblock.h>
 
 #include <asm/mach/arch.h>
 #include <asm/mach/map.h>
@@ -126,15 +127,13 @@ static struct platform_device *vstms_devices[] __initdata = {
 	&s3c_device_iis,
 	&s3c_device_rtc,
 	&s3c_device_nand,
+	&s3c2412_device_dma,
 };
 
-static void __init vstms_fixup(struct tag *tags, char **cmdline,
-			       struct meminfo *mi)
+static void __init vstms_fixup(struct tag *tags, char **cmdline)
 {
 	if (tags != phys_to_virt(S3C2410_SDRAM_PA + 0x100)) {
-		mi->nr_banks=1;
-		mi->bank[0].start = 0x30000000;
-		mi->bank[0].size = SZ_64M;
+		memblock_add(0x30000000, SZ_64M);
 	}
 }
 

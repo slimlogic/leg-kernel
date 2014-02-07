@@ -155,7 +155,7 @@ optional_header:
 	.short	0x20b				// PE32+ format
 	.byte	0x02				// MajorLinkerVersion
 	.byte	0x14				// MinorLinkerVersion
-	.long	__bss_start - stext		// SizeOfCode
+	.long	_edata - stext			// SizeOfCode
 	.long	0				// SizeOfInitializedData
 	.long	0				// SizeOfUninitializedData
 	.long	efi_stub_entry - efi_head	// AddressOfEntryPoint
@@ -164,7 +164,7 @@ optional_header:
 extra_header_fields:
 	.quad	0				// ImageBase
 	.long	0x20				// SectionAlignment
-	.long	0x20				// FileAlignment
+	.long	0x8				// FileAlignment
 	.short	0				// MajorOperatingSystemVersion
 	.short	0				// MinorOperatingSystemVersion
 	.short	0				// MajorImageVersion
@@ -173,7 +173,7 @@ extra_header_fields:
 	.short	0				// MinorSubsystemVersion
 	.long	0				// Win32VersionValue
 
-	.long	__bss_start - efi_head	// SizeOfImage
+	.long	_edata - efi_head		// SizeOfImage
 
 	// Everything before the kernel image is considered part of the header
 	.long	stext - efi_head			// SizeOfHeaders
@@ -185,7 +185,14 @@ extra_header_fields:
 	.quad	0				// SizeOfHeapReserve
 	.quad	0				// SizeOfHeapCommit
 	.long	0				// LoaderFlags
-	.long	0x0				// NumberOfRvaAndSizes
+	.long	0x6				// NumberOfRvaAndSizes
+
+	.quad	0				// ExportTable
+	.quad	0				// ImportTable
+	.quad	0				// ResourceTable
+	.quad	0				// ExceptionTable
+	.quad	0				// CertificationTable
+	.quad	0				// BaseRelocationTable
 
 	// Section table
 section_table:
@@ -213,9 +220,9 @@ section_table:
 	.byte	0
 	.byte	0
 	.byte	0        		// end of 0 padding of section name
-	.long	__bss_start - stext	// VirtualSize
+	.long	_edata - stext		// VirtualSize
 	.long	stext - efi_head	// VirtualAddress
-	.long	__bss_start - stext	// SizeOfRawData
+	.long	_edata - stext		// SizeOfRawData
 	.long	stext - efi_head	// PointerToRawData
 
 	.long	0		// PointerToRelocations (0 for executables)
@@ -228,8 +235,9 @@ section_table:
 
 ENTRY(stext)
 	mov	x21, x0				// x21=FDT
+	bl	el2_setup			// Drop to EL1, w20=cpu_boot_mode
 	bl	__calc_phys_offset		// x24=PHYS_OFFSET, x28=PHYS_OFFSET-PAGE_OFFSET
-	bl	el2_setup			// Drop to EL1
+	bl	set_cpu_boot_mode_flag
 	mrs	x22, midr_el1			// x22=cpuid
 	mov	x0, x22
 	bl	lookup_processor_type
@@ -255,21 +263,30 @@ ENDPROC(stext)
 /*
  * If we're fortunate enough to boot at EL2, ensure that the world is
  * sane before dropping to EL1.
+ *
+ * Returns either BOOT_CPU_MODE_EL1 or BOOT_CPU_MODE_EL2 in x20 if
+ * booted in EL1 or EL2 respectively.
  */
 ENTRY(el2_setup)
 	mrs	x0, CurrentEL
 	cmp	x0, #PSR_MODE_EL2t
 	ccmp	x0, #PSR_MODE_EL2h, #0x4, ne
-	ldr	x0, =__boot_cpu_mode		// Compute __boot_cpu_mode
-	add	x0, x0, x28
-	b.eq	1f
-	str	wzr, [x0]			// Remember we don't have EL2...
+	b.ne	1f
+	mrs	x0, sctlr_el2
+CPU_BE(	orr	x0, x0, #(1 << 25)	)	// Set the EE bit for EL2
+CPU_LE(	bic	x0, x0, #(1 << 25)	)	// Clear the EE bit for EL2
+	msr	sctlr_el2, x0
+	b	2f
+1:	mrs	x0, sctlr_el1
+CPU_BE(	orr	x0, x0, #(3 << 24)	)	// Set the EE and E0E bits for EL1
+CPU_LE(	bic	x0, x0, #(3 << 24)	)	// Clear the EE and E0E bits for EL1
+	msr	sctlr_el1, x0
+	mov	w20, #BOOT_CPU_MODE_EL1		// This cpu booted in EL1
+	isb
 	ret
 
 	/* Hyp configuration. */
-1:	ldr	w1, =BOOT_CPU_MODE_EL2
-	str	w1, [x0, #4]			// This CPU has EL2
-	mov	x0, #(1 << 31)			// 64-bit EL1
+2:	mov	x0, #(1 << 31)			// 64-bit EL1
 	msr	hcr_el2, x0
 
 	/* Generic timers. */
@@ -286,7 +303,8 @@ ENTRY(el2_setup)
 
 	/* sctlr_el1 */
 	mov	x0, #0x0800			// Set/clear RES{1,0} bits
-	movk	x0, #0x30d0, lsl #16
+CPU_BE(	movk	x0, #0x33d0, lsl #16	)	// Set EE and E0E on BE systems
+CPU_LE(	movk	x0, #0x30d0, lsl #16	)	// Clear EE and E0E on LE systems
 	msr	sctlr_el1, x0
 
 	/* Coprocessor traps. */
@@ -309,8 +327,23 @@ ENTRY(el2_setup)
 		      PSR_MODE_EL1h)
 	msr	spsr_el2, x0
 	msr	elr_el2, lr
+	mov	w20, #BOOT_CPU_MODE_EL2		// This CPU booted in EL2
 	eret
 ENDPROC(el2_setup)
+
+/*
+ * Sets the __boot_cpu_mode flag depending on the CPU boot mode passed
+ * in x20. See arch/arm64/include/asm/virt.h for more info.
+ */
+ENTRY(set_cpu_boot_mode_flag)
+	ldr	x1, =__boot_cpu_mode		// Compute __boot_cpu_mode
+	add	x1, x1, x28
+	cmp	w20, #BOOT_CPU_MODE_EL2
+	b.ne	1f
+	add	x1, x1, #4
+1:	str	w20, [x1]			// This CPU has booted in EL1
+	ret
+ENDPROC(set_cpu_boot_mode_flag)
 
 /*
  * We need to find out the CPU boot mode long after boot, so we need to
@@ -339,8 +372,9 @@ ENTRY(__boot_cpu_mode)
 	 * cores are held until we're ready for them to initialise.
 	 */
 ENTRY(secondary_holding_pen)
-	bl	__calc_phys_offset		// x24=phys offset
-	bl	el2_setup			// Drop to EL1
+	bl	el2_setup			// Drop to EL1, w20=cpu_boot_mode
+	bl	__calc_phys_offset		// x24=PHYS_OFFSET, x28=PHYS_OFFSET-PAGE_OFFSET
+	bl	set_cpu_boot_mode_flag
 	mrs	x0, mpidr_el1
 	ldr     x1, =MPIDR_HWID_BITMASK
 	and	x0, x0, x1
@@ -360,8 +394,9 @@ ENDPROC(secondary_holding_pen)
 	 * be used where CPUs are brought online dynamically by the kernel.
 	 */
 ENTRY(secondary_entry)
-	bl	__calc_phys_offset		// x2=phys offset
 	bl	el2_setup			// Drop to EL1
+	bl	__calc_phys_offset		// x24=PHYS_OFFSET, x28=PHYS_OFFSET-PAGE_OFFSET
+	bl	set_cpu_boot_mode_flag
 	b	secondary_startup
 ENDPROC(secondary_entry)
 
@@ -489,7 +524,7 @@ ENDPROC(__calc_phys_offset)
  *   - identity mapping to enable the MMU (low address, TTBR0)
  *   - first few MB of the kernel linear mapping to jump to once the MMU has
  *     been enabled, including the FDT blob (TTBR1)
- *   - pgd entry for fixed mappings
+ *   - pgd entry for fixed mappings (TTBR1)
  */
 __create_page_tables:
 	pgtbl	x25, x26, x24			// idmap_pg_dir and swapper_pg_dir addresses
@@ -556,8 +591,6 @@ ENDPROC(__create_page_tables)
 	.type	__switch_data, %object
 __switch_data:
 	.quad	__mmap_switched
-	.quad	__data_loc			// x4
-	.quad	_data				// x5
 	.quad	__bss_start			// x6
 	.quad	_end				// x7
 	.quad	processor_id			// x4
@@ -572,15 +605,7 @@ __switch_data:
 __mmap_switched:
 	adr	x3, __switch_data + 8
 
-	ldp	x4, x5, [x3], #16
 	ldp	x6, x7, [x3], #16
-	cmp	x4, x5				// Copy data segment if needed
-1:	ccmp	x5, x6, #4, ne
-	b.eq	2f
-	ldr	x16, [x4], #8
-	str	x16, [x5], #8
-	b	1b
-2:
 1:	cmp	x6, x7
 	b.hs	2f
 	str	xzr, [x6], #8			// Clear BSS

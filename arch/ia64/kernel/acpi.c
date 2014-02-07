@@ -53,7 +53,6 @@
 #include <asm/numa.h>
 #include <asm/sal.h>
 #include <asm/cyclone.h>
-#include <asm/xen/hypervisor.h>
 
 #define BAD_MADT_ENTRY(entry, end) (                                        \
 		(!entry) || (unsigned long)entry + sizeof(*entry) > end ||  \
@@ -61,7 +60,6 @@
 
 #define PREFIX			"ACPI: "
 
-u32 acpi_rsdt_forced;
 unsigned int acpi_cpei_override;
 unsigned int acpi_cpei_phys_cpuid;
 
@@ -120,8 +118,6 @@ acpi_get_sysname(void)
 			return "uv";
 		else
 			return "sn2";
-	} else if (xen_pv_domain() && !strcmp(hdr->oem_id, "XEN")) {
-		return "xen";
 	}
 
 #ifdef CONFIG_INTEL_IOMMU
@@ -882,40 +878,10 @@ __init void prefill_possible_map(void)
 		set_cpu_possible(i, true);
 }
 
-static int _acpi_map_lsapic(acpi_handle handle, int *pcpu)
+static int _acpi_map_lsapic(acpi_handle handle, int physid, int *pcpu)
 {
-	struct acpi_buffer buffer = { ACPI_ALLOCATE_BUFFER, NULL };
-	union acpi_object *obj;
-	struct acpi_madt_local_sapic *lsapic;
 	cpumask_t tmp_map;
-	int cpu, physid;
-
-	if (ACPI_FAILURE(acpi_evaluate_object(handle, "_MAT", NULL, &buffer)))
-		return -EINVAL;
-
-	if (!buffer.length || !buffer.pointer)
-		return -EINVAL;
-
-	obj = buffer.pointer;
-	if (obj->type != ACPI_TYPE_BUFFER)
-	{
-		kfree(buffer.pointer);
-		return -EINVAL;
-	}
-
-	lsapic = (struct acpi_madt_local_sapic *)obj->buffer.pointer;
-
-	if ((lsapic->header.type != ACPI_MADT_TYPE_LOCAL_SAPIC) ||
-	    (!(lsapic->lapic_flags & ACPI_MADT_ENABLED))) {
-		kfree(buffer.pointer);
-		return -EINVAL;
-	}
-
-	physid = ((lsapic->id << 8) | (lsapic->eid));
-
-	kfree(buffer.pointer);
-	buffer.length = ACPI_ALLOCATE_BUFFER;
-	buffer.pointer = NULL;
+	int cpu;
 
 	cpumask_complement(&tmp_map, cpu_present_mask);
 	cpu = cpumask_first(&tmp_map);
@@ -934,9 +900,9 @@ static int _acpi_map_lsapic(acpi_handle handle, int *pcpu)
 }
 
 /* wrapper to silence section mismatch warning */
-int __ref acpi_map_lsapic(acpi_handle handle, int *pcpu)
+int __ref acpi_map_lsapic(acpi_handle handle, int physid, int *pcpu)
 {
-	return _acpi_map_lsapic(handle, pcpu);
+	return _acpi_map_lsapic(handle, physid, pcpu);
 }
 EXPORT_SYMBOL(acpi_map_lsapic);
 
@@ -1048,3 +1014,20 @@ EXPORT_SYMBOL(acpi_unregister_ioapic);
  * TBD when when IA64 starts to support suspend...
  */
 int acpi_suspend_lowlevel(void) { return 0; }
+
+void arch_acpi_set_pdc_bits(u32 *buf)
+{
+	/* Enable coordination with firmware's _TSD info */
+	buf[2] |= ACPI_PDC_SMP_T_SWCOORD;
+	if (boot_option_idle_override == IDLE_NOMWAIT) {
+		/*
+		 * If mwait is disabled for CPU C-states, the C2C3_FFH access
+		 * mode will be disabled in the parameter of _PDC object.
+		 * Of course C1_FFH access mode will also be disabled.
+		 */
+		buf[2] &= ~(ACPI_PDC_C_C2C3_FFH | ACPI_PDC_C_C1_FFH);
+
+	}
+
+	buf[2] |= ACPI_PDC_EST_CAPABILITY_SMP;
+}

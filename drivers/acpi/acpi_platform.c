@@ -29,6 +29,31 @@ ACPI_MODULE_NAME("platform");
 static const struct acpi_device_id acpi_platform_device_ids[] = {
 
 	{ "PNP0D40" },
+	{ "ACPI0003" },
+	{ "VPC2004" },
+	{ "BCM4752" },
+
+	/* Intel Smart Sound Technology */
+	{ "INT33C8" },
+	{ "80860F28" },
+
+	/* arm64 platform devices */
+	{ "LNRO0003" }, /* smc91x for ethernet */
+	{ "LNRO0005" }, /* virtio mmio */
+	{ "LNRO0007" }, /* armv8 pmu */
+	{ "LNRO0008" }, /* Fixed clock */
+	{ "LNRO0009" }, /* vexpress-sysreg */
+	{ "LNRO000A" }, /* uart-pl011 */
+	{ "LNRO000F" }, /* kmi0,kmi1 */
+	{ "LNRO0011" }, /* wdt */
+	{ "LNRO0013" }, /* rtc */
+	{ "LNRO0016" }, /* flash jedec_probe */
+	{ "LNRO0015" }, /* flash cfi_probe */
+	{ "LNRO0017" }, /* flash map_ram */
+	{ "LNRO0018" }, /* flash direct-mapped */
+	{ "LNRO0019" }, /* fixed regulator */
+
+	{ "AMBA0000" },
 
 	/* arm64 platform devices */
 	{ "LNRO0003" }, /* smc91x for ethernet */
@@ -111,7 +136,7 @@ int acpi_create_platform_device(struct acpi_device *adev,
 	pdevinfo.id = -1;
 	pdevinfo.res = resources;
 	pdevinfo.num_res = count;
-	pdevinfo.acpi_node.handle = adev->handle;
+	pdevinfo.acpi_node.companion = adev;
 	pdev = platform_device_register_full(&pdevinfo);
 	if (IS_ERR(pdev)) {
 		dev_err(&adev->dev, "platform device creation failed: %ld\n",

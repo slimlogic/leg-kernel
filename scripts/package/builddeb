@@ -66,8 +66,48 @@ create_package() {
 	chown -R root:root "$pdir"
 	chmod -R go-w "$pdir"
 
+	# Attempt to find the correct Debian architecture
+	local forcearch="" debarch=""
+	case "$UTS_MACHINE" in
+	i386|ia64|alpha)
+		debarch="$UTS_MACHINE" ;;
+	x86_64)
+		debarch=amd64 ;;
+	sparc*)
+		debarch=sparc ;;
+	s390*)
+		debarch=s390 ;;
+	ppc*)
+		debarch=powerpc ;;
+	parisc*)
+		debarch=hppa ;;
+	mips*)
+		debarch=mips$(grep -q CPU_LITTLE_ENDIAN=y $KCONFIG_CONFIG && echo el || true) ;;
+	arm*)
+		if grep -q '^CONFIG_ARM64=y' $KCONFIG_CONFIG ; then
+			debarch=arm64
+		else
+			debarch=arm$(grep -q CONFIG_AEABI=y $KCONFIG_CONFIG && echo el || true)
+		fi ;;
+	*)
+		echo "" >&2
+		echo "** ** **  WARNING  ** ** **" >&2
+		echo "" >&2
+		echo "Your architecture doesn't have it's equivalent" >&2
+		echo "Debian userspace architecture defined!" >&2
+		echo "Falling back to using your current userspace instead!" >&2
+		echo "Please add support for $UTS_MACHINE to ${0} ..." >&2
+		echo "" >&2
+	esac
+	if [ -n "$KBUILD_DEBARCH" ] ; then
+		debarch="$KBUILD_DEBARCH"
+	fi
+	if [ -n "$debarch" ] ; then
+		forcearch="-DArchitecture=$debarch"
+	fi
+
 	# Create the package
-	dpkg-gencontrol -isp $forcearch -p$pname -P"$pdir"
+	dpkg-gencontrol -isp $forcearch -Vkernel:debarch="${debarch:-$(dpkg --print-architecture)}" -p$pname -P"$pdir"
 	dpkg --build "$pdir" ..
 }
 
@@ -180,8 +220,15 @@ fi
 
 # Install the maintainer scripts
 # Note: hook scripts under /etc/kernel are also executed by official Debian
-# kernel packages, as well as kernel packages built using make-kpkg
+# kernel packages, as well as kernel packages built using make-kpkg.
+# make-kpkg sets $INITRD to indicate whether an initramfs is wanted, and
+# so do we; recent versions of dracut and initramfs-tools will obey this.
 debhookdir=${KDEB_HOOKDIR:-/etc/kernel}
+if grep -q '^CONFIG_BLK_DEV_INITRD=y' $KCONFIG_CONFIG; then
+	want_initrd=Yes
+else
+	want_initrd=No
+fi
 for script in postinst postrm preinst prerm ; do
 	mkdir -p "$tmpdir$debhookdir/$script.d"
 	cat <<EOF > "$tmpdir/DEBIAN/$script"
@@ -191,6 +238,9 @@ set -e
 
 # Pass maintainer script parameters to hook scripts
 export DEB_MAINT_PARAMS="\$*"
+
+# Tell initramfs builder whether it's wanted
+export INITRD=$want_initrd
 
 test -d $debhookdir/$script.d && run-parts --arg="$version" --arg="/$installed_image_path" $debhookdir/$script.d
 exit 0
@@ -301,9 +351,9 @@ cat <<EOF >> debian/control
 
 Package: $kernel_headers_packagename
 Provides: linux-headers, linux-headers-2.6
-Architecture: $debarch
-Description: Linux kernel headers for $KERNELRELEASE on $debarch
- This package provides kernel header files for $KERNELRELEASE on $debarch
+Architecture: any
+Description: Linux kernel headers for $KERNELRELEASE on \${kernel:debarch}
+ This package provides kernel header files for $KERNELRELEASE on \${kernel:debarch}
  .
  This is useful for people who need to build external modules
 EOF

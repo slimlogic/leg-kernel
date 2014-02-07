@@ -15,6 +15,7 @@ obj-$(CONFIG_X86)		+= blacklist.o
 # ACPI Core Subsystem (Interpreter)
 #
 obj-y				+= acpi.o \
+					acpi_keyvalue.o \
 					acpica/
 
 # All the builtin files are in the "acpi." module_param namespace.
@@ -48,7 +49,6 @@ acpi-y				+= sysfs.o
 acpi-$(CONFIG_X86)		+= acpi_cmos_rtc.o
 acpi-$(CONFIG_DEBUG_FS)		+= debugfs.o
 acpi-$(CONFIG_ACPI_NUMA)	+= numa.o
-acpi-$(CONFIG_ACPI_PROCFS_POWER) += cm_sbs.o
 ifdef CONFIG_ACPI_VIDEO
 acpi-y				+= video_detect.o
 endif
@@ -84,4 +84,6 @@ obj-$(CONFIG_ACPI_PROCESSOR_AGGREGATOR) += acpi_pad.o
 
 obj-$(CONFIG_ACPI_APEI)		+= apei/
 
-obj-y					+= plat/
+obj-$(CONFIG_ACPI_EXTLOG)	+= acpi_extlog.o
+
+obj-y				+= plat/

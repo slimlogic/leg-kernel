@@ -455,7 +455,12 @@ static const struct iio_chan_spec_ext_info bma180_ext_info[] = {
 		BIT(IIO_CHAN_INFO_LOW_PASS_FILTER_3DB_FREQUENCY),	\
 	.info_mask_shared_by_type = BIT(IIO_CHAN_INFO_SCALE),		\
 	.scan_index = (_index),						\
-	.scan_type = IIO_ST('s', 14, 16, 2),				\
+	.scan_type = {							\
+		.sign = 's',						\
+		.realbits = 14,						\
+		.storagebits = 16,					\
+		.shift = 2,						\
+	},								\
 	.ext_info = bma180_ext_info,					\
 }
 
@@ -471,13 +476,10 @@ static irqreturn_t bma180_trigger_handler(int irq, void *p)
 	struct iio_poll_func *pf = p;
 	struct iio_dev *indio_dev = pf->indio_dev;
 	struct bma180_data *data = iio_priv(indio_dev);
+	int64_t time_ns = iio_get_time_ns();
 	int bit, ret, i = 0;
 
 	mutex_lock(&data->mutex);
-	if (indio_dev->scan_timestamp) {
-		ret = indio_dev->scan_bytes / sizeof(s64) - 1;
-		((s64 *)data->buff)[ret] = iio_get_time_ns();
-	}
 
 	for_each_set_bit(bit, indio_dev->buffer->scan_mask,
 			 indio_dev->masklength) {
@@ -490,7 +492,7 @@ static irqreturn_t bma180_trigger_handler(int irq, void *p)
 	}
 	mutex_unlock(&data->mutex);
 
-	iio_push_to_buffers(indio_dev, (u8 *)data->buff);
+	iio_push_to_buffers_with_timestamp(indio_dev, data->buff, time_ns);
 err:
 	iio_trigger_notify_done(indio_dev->trig);
 

@@ -56,7 +56,8 @@ enum probes_t32_action {
 	PROBES_T32_REVERSE,
 	PROBES_T32_MUL_ADD,
 	PROBES_T32_MUL_ADD2,
-	PROBES_T32_MUL_ADD_LONG
+	PROBES_T32_MUL_ADD_LONG,
+	NUM_PROBES_T32_ACTIONS
 };
 
 enum probes_t16_action {
@@ -79,17 +80,18 @@ enum probes_t16_action {
 	PROBES_T16_ADR,
 	PROBES_T16_LDMSTM,
 	PROBES_T16_BRANCH_COND,
-	PROBES_T16_BRANCH
+	PROBES_T16_BRANCH,
+	NUM_PROBES_T16_ACTIONS
 };
 
 extern const union decode_item probes_decode_thumb32_table[];
 extern const union decode_item probes_decode_thumb16_table[];
 
 enum probes_insn __kprobes
-thumb16_probes_decode_insn(probes_opcode_t insn, struct arch_specific_insn *asi,
-		   bool usermode, const union decode_item *actions);
+thumb16_probes_decode_insn(probes_opcode_t insn, struct arch_probes_insn *asi,
+		bool emulate, const union decode_action *actions);
 enum probes_insn __kprobes
-thumb32_probes_decode_insn(probes_opcode_t insn, struct arch_specific_insn *asi,
-		   bool usermode, const union decode_item *actions);
+thumb32_probes_decode_insn(probes_opcode_t insn, struct arch_probes_insn *asi,
+		bool emulate, const union decode_action *actions);
 
 #endif

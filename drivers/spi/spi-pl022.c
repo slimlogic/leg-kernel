@@ -43,6 +43,7 @@
 #include <linux/gpio.h>
 #include <linux/of_gpio.h>
 #include <linux/pinctrl/consumer.h>
+#include <linux/amba/acpi.h>
 
 /*
  * This macro is used to define some register default values.
@@ -1619,7 +1620,6 @@ static int verify_controller_parameters(struct pl022 *pl022,
 		dev_err(&pl022->adev->dev,
 			"RX FIFO Trigger Level is configured incorrectly\n");
 		return -EINVAL;
-		break;
 	}
 	switch (chip_info->tx_lev_trig) {
 	case SSP_TX_1_OR_MORE_EMPTY_LOC:
@@ -1645,7 +1645,6 @@ static int verify_controller_parameters(struct pl022 *pl022,
 		dev_err(&pl022->adev->dev,
 			"TX FIFO Trigger Level is configured incorrectly\n");
 		return -EINVAL;
-		break;
 	}
 	if (chip_info->iface == SSP_INTERFACE_NATIONAL_MICROWIRE) {
 		if ((chip_info->ctrl_len < SSP_BITS_4)
@@ -2069,6 +2068,49 @@ pl022_platform_data_dt_get(struct device *dev)
 	return pd;
 }
 
+#ifdef CONFIG_ACPI
+static struct pl022_ssp_controller *
+acpi_pl022_get_platform_data(struct device *dev)
+{
+	struct pl022_ssp_controller *pd, *ret;
+	struct acpi_amba_dsm_entry entry;
+
+	pd = devm_kzalloc(dev, sizeof(struct pl022_ssp_controller), GFP_KERNEL);
+	if (!pd) {
+		dev_err(dev, "cannot allocate platform data memory\n");
+		return NULL;
+	}
+	ret = pd;
+
+	pd->bus_id = -1;
+	pd->enable_dma = 1;
+	if (acpi_amba_dsm_lookup(ACPI_HANDLE(dev), "num-cs", 0, &entry) == 0) {
+		if (kstrtou8(entry.value, 0, &pd->num_chipselect) != 0) {
+			dev_err(dev, "invalid 'num-cs' in ACPI definition\n");
+			ret = NULL;
+		}
+		kfree(entry.key);
+		kfree(entry.value);
+	}
+	if (acpi_amba_dsm_lookup(ACPI_HANDLE(dev),
+			"autosuspend-delay", 0, &entry) == 0) {
+		if (kstrtoint(entry.value, 0, &pd->autosuspend_delay) != 0) {
+			dev_err(dev, "invalid 'autosuspend-delay' in ACPI definition\n");
+			ret = NULL;
+		}
+		kfree(entry.key);
+		kfree(entry.value);
+	}
+	if (acpi_amba_dsm_lookup(ACPI_HANDLE(dev), "rt", 0, &entry) == 0) {
+		pd->rt = (entry.value && strcmp(entry.value, "1") == 0);
+		kfree(entry.key);
+		kfree(entry.value);
+	}
+
+	return ret;
+}
+#endif
+
 static int pl022_probe(struct amba_device *adev, const struct amba_id *id)
 {
 	struct device *dev = &adev->dev;
@@ -2081,6 +2123,11 @@ static int pl022_probe(struct amba_device *adev, const struct amba_id *id)
 
 	dev_info(&adev->dev,
 		 "ARM PL022 driver, device ID: 0x%08x\n", adev->periphid);
+#ifdef CONFIG_ACPI
+	if (!platform_info && ACPI_HANDLE(dev))
+		platform_info = acpi_pl022_get_platform_data(dev);
+	else
+#endif
 	if (!platform_info && IS_ENABLED(CONFIG_OF))
 		platform_info = pl022_platform_data_dt_get(dev);
 
@@ -2175,8 +2222,8 @@ static int pl022_probe(struct amba_device *adev, const struct amba_id *id)
 		status = -ENOMEM;
 		goto err_no_ioremap;
 	}
-	printk(KERN_INFO "pl022: mapped registers from %pa to %p\n",
-	       &adev->res.start, pl022->virtbase);
+	dev_info(&adev->dev, "mapped registers from %pa to %p\n",
+		&adev->res.start, pl022->virtbase);
 
 	pl022->clk = devm_clk_get(&adev->dev, NULL);
 	if (IS_ERR(pl022->clk)) {
@@ -2227,7 +2274,7 @@ static int pl022_probe(struct amba_device *adev, const struct amba_id *id)
 
 	/* Register with the SPI framework */
 	amba_set_drvdata(adev, pl022);
-	status = spi_register_master(master);
+	status = devm_spi_register_master(&adev->dev, master);
 	if (status != 0) {
 		dev_err(&adev->dev,
 			"probe - problem registering spi master\n");
@@ -2287,8 +2334,6 @@ pl022_remove(struct amba_device *adev)
 	clk_unprepare(pl022->clk);
 	amba_release_regions(adev);
 	tasklet_disable(&pl022->pump_transfers);
-	spi_unregister_master(pl022->master);
-	amba_set_drvdata(adev, NULL);
 	return 0;
 }
 

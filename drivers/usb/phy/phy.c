@@ -98,7 +98,7 @@ struct usb_phy *devm_usb_get_phy(struct device *dev, enum usb_phy_type type)
 
 	ptr = devres_alloc(devm_usb_phy_release, sizeof(*ptr), GFP_KERNEL);
 	if (!ptr)
-		return NULL;
+		return ERR_PTR(-ENOMEM);
 
 	phy = usb_get_phy(type);
 	if (!IS_ERR(phy)) {
@@ -329,6 +329,8 @@ int usb_add_phy(struct usb_phy *x, enum usb_phy_type type)
 		return -EINVAL;
 	}
 
+	ATOMIC_INIT_NOTIFIER_HEAD(&x->notifier);
+
 	spin_lock_irqsave(&phy_lock, flags);
 
 	list_for_each_entry(phy, &phy_list, head) {
@@ -366,6 +368,8 @@ int usb_add_phy_dev(struct usb_phy *x)
 		dev_err(x->dev, "no device provided for PHY\n");
 		return -EINVAL;
 	}
+
+	ATOMIC_INIT_NOTIFIER_HEAD(&x->notifier);
 
 	spin_lock_irqsave(&phy_lock, flags);
 	list_for_each_entry(phy_bind, &phy_bind_list, list)
