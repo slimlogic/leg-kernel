@@ -22,8 +22,6 @@
  * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
  */
 
-#ifdef CONFIG_GUFI
-
 #include "acpi_protocol.h"
 
 static acpi_status __gufi_acpi_find_first_callback(acpi_handle handle,
@@ -90,5 +88,3 @@ void gufi_acpi_node_put(struct gufi_device_node *gdn)
 	/* ACPI doesn't really do reference counting */
 	return;
 }
-
-#endif	/* CONFIG_GUFI */

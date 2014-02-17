@@ -22,8 +22,6 @@
  * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
  */
 
-#ifdef	CONFIG_GUFI
-
 #include <linux/gufi.h>
 #include <linux/init.h>
 #include <linux/spinlock.h>
@@ -308,5 +306,3 @@ int __init gufi_init(void)
 	return 0;
 }
 EXPORT_SYMBOL(gufi_init);
-
-#endif	/* CONFIG_GUFI */

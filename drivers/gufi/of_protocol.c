@@ -22,8 +22,6 @@
  * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
  */
 
-#ifdef CONFIG_GUFI
-
 #include <linux/gufi.h>
 #include <linux/of.h>
 
@@ -56,5 +54,3 @@ void gufi_of_node_put(struct gufi_device_node *gdn)
 		if (gdn->dn)
 			of_node_put(gdn->dn);
 }
-
-#endif	/* CONFIG_GUFI */

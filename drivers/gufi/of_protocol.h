@@ -25,15 +25,11 @@
 #ifndef _GUFI_OF_PROTOCOL_H
 #define _GUFI_OF_PROTOCOL_H
 
-#ifdef CONFIG_GUFI
-
 #include <linux/gufi.h>
 #include <linux/of.h>
 
 extern struct gufi_device_node *gufi_of_find_first_node(const char *name);
 extern struct gufi_device_node *gufi_of_node_get(struct gufi_device_node *gdn);
 extern void gufi_of_node_put(struct gufi_device_node *gdn);
-
-#endif	/* CONFIG_GUFI */
 
 #endif	/*_GUFI_OF_PROTOCOL_H */

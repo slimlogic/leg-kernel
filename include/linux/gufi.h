@@ -25,8 +25,6 @@
 #ifndef _LINUX_GUFI_H
 #define _LINUX_GUFI_H
 
-#ifdef CONFIG_GUFI
-
 #include <linux/acpi.h>
 #include <linux/errno.h>
 #include <linux/kref.h>
@@ -64,7 +62,5 @@ extern void gufi_node_put(struct gufi_device_node *gdn);
 
 /* Functions returning configuration information */
 extern struct gufi_device_node *gufi_find_first_node(const char *name);
-
-#endif	/* CONFIG_GUFI */
 
 #endif	/*_LINUX_GUFI_H */
