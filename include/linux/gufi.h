@@ -49,18 +49,18 @@ struct gufi_protocol {
 };
 
 /* General GUFI functionality */
-extern int gufi_init(void);
-extern int gufi_register_protocol(struct gufi_protocol *prot);
-extern void gufi_unregister_protocol(struct gufi_protocol *prot);
+int gufi_init(void);
+int gufi_register_protocol(struct gufi_protocol *prot);
+void gufi_unregister_protocol(struct gufi_protocol *prot);
 
-extern struct gufi_device_node *gufi_look_for_node(struct device_node *dn,
-						   struct acpi_device *an);
+struct gufi_device_node *gufi_look_for_node(struct device_node *dn,
+		struct acpi_device *an);
 
 /* Reference counting functions */
-extern struct gufi_device_node *gufi_node_get(struct gufi_device_node *gdn);
-extern void gufi_node_put(struct gufi_device_node *gdn);
+struct gufi_device_node *gufi_node_get(struct gufi_device_node *gdn);
+void gufi_node_put(struct gufi_device_node *gdn);
 
 /* Functions returning configuration information */
-extern struct gufi_device_node *gufi_find_first_node(const char *name);
+struct gufi_device_node *gufi_find_first_node(const char *name);
 
 #endif	/*_LINUX_GUFI_H */
