@@ -78,5 +78,7 @@ struct gufi_device_node *gufi_find_first_node(const char *name);
 const struct gufi_device_id gufi_match_device(const struct gufi_device_id ids,
 		const struct device *dev);
 bool gufi_test_match(const struct gufi_device_id id);
+int gufi_property_read_u32(const struct gufi_device_node *gdn,
+		const char *propname, u32 *out_value);
 
 #endif	/*_LINUX_GUFI_H */

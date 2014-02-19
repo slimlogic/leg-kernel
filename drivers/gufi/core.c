@@ -269,6 +269,35 @@ bool gufi_test_match(const struct gufi_device_id id)
 }
 EXPORT_SYMBOL(gufi_test_match);
 
+int gufi_property_read_u32(const struct gufi_device_node *gdn,
+		const char *propname, u32 *out_value)
+{
+	int res;
+
+	if (!gdn || !propname || !out_value)
+		return -EINVAL;
+
+	if (acpi_disabled) {
+		res = of_property_read_u32(gdn->dn, propname, out_value);
+	} else {
+		acpi_handle handle = acpi_device_handle(gdn->an);
+		struct acpi_dsm_entry entry;
+
+		res = acpi_dsm_lookup_value(handle, propname, 0, &entry);
+		if (res != 0)
+			return -ENODATA;
+
+		if (kstrtouint(entry.value, 0, out_value) != 0)
+			return -EINVAL;
+
+		kfree(entry.key);
+		kfree(entry.value);
+	}
+
+	return res;
+}
+EXPORT_SYMBOL(gufi_property_read_u32);
+
 struct gufi_device_node *gufi_node_get(struct gufi_device_node *gdn)
 {
 	struct gufi_device_node *result = NULL;
