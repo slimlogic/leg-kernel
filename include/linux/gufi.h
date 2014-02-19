@@ -48,6 +48,19 @@ struct gufi_protocol {
 	void (*node_put)(struct gufi_device_node *gdn);
 };
 
+struct gufi_device_id {
+	const struct of_device_id *of_ids;
+	const struct acpi_device_id *acpi_ids;
+};
+
+#define __GUFI_MATCH_INITIALIZER(ofs, acpis) {			\
+	.of_ids = of_match_ptr(ofs),				\
+	.acpi_ids = ACPI_PTR(acpis)				\
+	}
+
+#define DECLARE_GUFI_MATCH(name, ofs, acpis)			\
+	struct gufi_device_id name = __GUFI_MATCH_INITIALIZER(ofs, acpis)
+
 /* General GUFI functionality */
 int gufi_init(void);
 int gufi_register_protocol(struct gufi_protocol *prot);
@@ -62,5 +75,8 @@ void gufi_node_put(struct gufi_device_node *gdn);
 
 /* Functions returning configuration information */
 struct gufi_device_node *gufi_find_first_node(const char *name);
+const struct gufi_device_id gufi_match_device(const struct gufi_device_id ids,
+		const struct device *dev);
+bool gufi_test_match(const struct gufi_device_id id);
 
 #endif	/*_LINUX_GUFI_H */

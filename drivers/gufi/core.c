@@ -26,6 +26,10 @@
 #include <linux/init.h>
 #include <linux/spinlock.h>
 
+/* TODO: move OF and ACPI functionality to separate files and get rid of this */
+#include <linux/of_device.h>
+#include <linux/acpi.h>
+
 #include "of_protocol.h"
 #include "acpi_protocol.h"
 
@@ -244,6 +248,26 @@ struct gufi_device_node *gufi_find_first_node(const char *name)
 	return result;
 }
 EXPORT_SYMBOL(gufi_find_first_node);
+
+const struct gufi_device_id gufi_match_device(const struct gufi_device_id ids,
+		const struct device *dev)
+{
+	struct gufi_device_id res = { NULL, NULL };
+
+	if (acpi_disabled)
+		res.of_ids = of_match_device(ids.of_ids, dev);
+	else
+		res.acpi_ids = acpi_match_device(ids.acpi_ids, dev);
+
+	return res;
+}
+EXPORT_SYMBOL(gufi_match_device);
+
+bool gufi_test_match(const struct gufi_device_id id)
+{
+	return id.of_ids != NULL || id.acpi_ids != NULL;
+}
+EXPORT_SYMBOL(gufi_test_match);
 
 struct gufi_device_node *gufi_node_get(struct gufi_device_node *gdn)
 {
