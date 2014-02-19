@@ -26,7 +26,6 @@
 #define _GUFI_ACPI_PROTOCOL_H
 
 #include <linux/gufi.h>
-#include <linux/of.h>
 
 struct gufi_device_node *gufi_acpi_find_first_node(const char *name);
 struct gufi_device_node *gufi_acpi_node_get(struct gufi_device_node *gdn);
