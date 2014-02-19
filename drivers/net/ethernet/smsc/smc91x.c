@@ -82,6 +82,7 @@ static const char version[] =
 #include <linux/of.h>
 #include <linux/of_device.h>
 #include <linux/acpi.h>
+#include <linux/gufi.h>
 
 #include <linux/netdevice.h>
 #include <linux/etherdevice.h>
@@ -2185,13 +2186,24 @@ static void smc_release_datacs(struct platform_device *pdev, struct net_device *
 }
 
 #if IS_BUILTIN(CONFIG_OF)
-static const struct of_device_id smc91x_match[] = {
+static const struct of_device_id smc91x_dt_match[] = {
 	{ .compatible = "smsc,lan91c94", },
 	{ .compatible = "smsc,lan91c111", },
 	{},
 };
-MODULE_DEVICE_TABLE(of, smc91x_match);
+MODULE_DEVICE_TABLE(of, smc91x_dt_match);
 #endif
+
+#ifdef CONFIG_ACPI
+static const struct acpi_device_id smc91x_acpi_match[] = {
+	{ "LNRO0003", },
+	{ }
+};
+MODULE_DEVICE_TABLE(acpi, smc91x_acpi_match);
+#endif
+
+static const DECLARE_GUFI_MATCH(smc91x_gufi_match, smc91x_dt_match,
+		smc91x_acpi_match);
 
 /*
  * smc_init(void)
@@ -2207,7 +2219,7 @@ MODULE_DEVICE_TABLE(of, smc91x_match);
 static int smc_drv_probe(struct platform_device *pdev)
 {
 	struct smc91x_platdata *pd = dev_get_platdata(&pdev->dev);
-	const struct of_device_id *match = NULL;
+	struct gufi_device_id match = { NULL, NULL };
 	struct smc_local *lp;
 	struct net_device *ndev;
 	struct resource *res, *ires;
@@ -2234,14 +2246,14 @@ static int smc_drv_probe(struct platform_device *pdev)
 		lp->io_shift = SMC91X_IO_SHIFT(lp->cfg.flags);
 	}
 
-#if IS_BUILTIN(CONFIG_OF)
-	match = of_match_device(of_match_ptr(smc91x_match), &pdev->dev);
-	if (match) {
-		struct device_node *np = pdev->dev.of_node;
+	match = gufi_match_device(smc91x_gufi_match, &pdev->dev);
+	if (gufi_test_match(match)) {
+		struct gufi_device_node *gdn = gufi_look_for_node(
+				pdev->dev.of_node, ACPI_COMPANION(&pdev->dev));
 		u32 val;
 
 		/* Combination of IO widths supported, default to 16-bit */
-		if (!of_property_read_u32(np, "reg-io-width", &val)) {
+		if (!gufi_property_read_u32(gdn, "reg-io-width", &val)) {
 			if (val & 1)
 				lp->cfg.flags |= SMC91X_USE_8BIT;
 			if ((val == 0) || (val & 2))
@@ -2252,9 +2264,8 @@ static int smc_drv_probe(struct platform_device *pdev)
 			lp->cfg.flags |= SMC91X_USE_16BIT;
 		}
 	}
-#endif
 
-	if (!pd && !match) {
+	if (!pd && !gufi_test_match(match)) {
 		lp->cfg.flags |= (SMC_CAN_USE_8BIT)  ? SMC91X_USE_8BIT  : 0;
 		lp->cfg.flags |= (SMC_CAN_USE_16BIT) ? SMC91X_USE_16BIT : 0;
 		lp->cfg.flags |= (SMC_CAN_USE_32BIT) ? SMC91X_USE_32BIT : 0;
@@ -2408,14 +2419,6 @@ static struct dev_pm_ops smc_drv_pm_ops = {
 	.resume		= smc_drv_resume,
 };
 
-#ifdef CONFIG_ACPI
-static const struct acpi_device_id smc91x_acpi_match[] = {
-	{ "LNRO0003", },
-	{ }
-};
-MODULE_DEVICE_TABLE(acpi, smc91x_acpi_match);
-#endif
-
 static struct platform_driver smc_driver = {
 	.probe		= smc_drv_probe,
 	.remove		= smc_drv_remove,
@@ -2423,7 +2426,7 @@ static struct platform_driver smc_driver = {
 		.name	= CARDNAME,
 		.owner	= THIS_MODULE,
 		.pm	= &smc_drv_pm_ops,
-		.of_match_table = of_match_ptr(smc91x_match),
+		.of_match_table = of_match_ptr(smc91x_dt_match),
 		.acpi_match_table = ACPI_PTR(smc91x_acpi_match),
 	},
 };
