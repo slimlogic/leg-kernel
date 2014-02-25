@@ -112,11 +112,13 @@ int gufi_acpi_property_read_u32(const struct gufi_device_node *gdn,
 
 	res = acpi_dsm_lookup_value(handle, propname, 0, &entry);
 	if (res != 0)
-		return -ENODATA;
+		goto out;
 
-	if (kstrtouint(entry.value, 0, out_value) != 0)
-		return -EINVAL;
+	res = kstrtouint(entry.value, 0, out_value);
+	if (res != 0)
+		goto out;
 
+out:
 	kfree(entry.key);
 	kfree(entry.value);
 
