@@ -46,6 +46,9 @@ struct gufi_protocol {
 	struct gufi_device_node *(*find_first_node)(const char *name);
 	struct gufi_device_node *(*node_get)(struct gufi_device_node *gdn);
 	void (*node_put)(struct gufi_device_node *gdn);
+	const struct gufi_device_id (*match_device)(
+			const struct gufi_device_id ids,
+			const struct device *dev);
 };
 
 struct gufi_device_id {

@@ -24,6 +24,7 @@
 
 #include <linux/gufi.h>
 #include <linux/of.h>
+#include <linux/of_device.h>
 
 #include "of_protocol.h"
 
@@ -53,4 +54,13 @@ void gufi_of_node_put(struct gufi_device_node *gdn)
 	if (gdn)
 		if (gdn->dn)
 			of_node_put(gdn->dn);
+}
+
+const struct gufi_device_id gufi_of_match_device(
+		const struct gufi_device_id ids, const struct device *dev)
+{
+	struct gufi_device_id res;
+
+	res.of_ids = of_match_device(ids.of_ids, dev);
+	return res;
 }

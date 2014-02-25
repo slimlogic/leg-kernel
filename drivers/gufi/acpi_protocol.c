@@ -88,3 +88,12 @@ void gufi_acpi_node_put(struct gufi_device_node *gdn)
 	/* ACPI doesn't really do reference counting */
 	return;
 }
+
+const struct gufi_device_id gufi_acpi_match_device(
+		const struct gufi_device_id ids, const struct device *dev)
+{
+	struct gufi_device_id res;
+
+	res.acpi_ids = acpi_match_device(ids.acpi_ids, dev);
+	return res;
+}

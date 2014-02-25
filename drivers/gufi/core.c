@@ -252,13 +252,17 @@ EXPORT_SYMBOL(gufi_find_first_node);
 const struct gufi_device_id gufi_match_device(const struct gufi_device_id ids,
 		const struct device *dev)
 {
+	struct gufi_protocol *p;
 	struct gufi_device_id res = { NULL, NULL };
 
-	if (acpi_disabled)
-		res.of_ids = of_match_device(ids.of_ids, dev);
-	else
-		res.acpi_ids = acpi_match_device(ids.acpi_ids, dev);
+	list_for_each_entry(p, &__protocols, entry) {
+		if (!p->match_device)
+			continue;
+		res = p->match_device(ids, dev);
+		return res;
+	}
 
+	pr_err("GUFI: all protocols are missing match_device callback\n");
 	return res;
 }
 EXPORT_SYMBOL(gufi_match_device);
@@ -340,6 +344,7 @@ static struct gufi_protocol acpi_protocol = {
 	.find_first_node = gufi_acpi_find_first_node,
 	.node_get = gufi_acpi_node_get,
 	.node_put = gufi_acpi_node_put,
+	.match_device = gufi_acpi_match_device,
 };
 
 static struct gufi_protocol of_protocol = {
@@ -347,6 +352,7 @@ static struct gufi_protocol of_protocol = {
 	.find_first_node = gufi_of_find_first_node,
 	.node_get = gufi_of_node_get,
 	.node_put = gufi_of_node_put,
+	.match_device = gufi_of_match_device,
 };
 
 int __init gufi_init(void)

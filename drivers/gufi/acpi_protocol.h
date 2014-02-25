@@ -30,5 +30,7 @@
 struct gufi_device_node *gufi_acpi_find_first_node(const char *name);
 struct gufi_device_node *gufi_acpi_node_get(struct gufi_device_node *gdn);
 void gufi_acpi_node_put(struct gufi_device_node *gdn);
+const struct gufi_device_id gufi_acpi_match_device(
+		const struct gufi_device_id ids, const struct device *dev);
 
 #endif	/*_GUFI_ACPI_PROTOCOL_H */
