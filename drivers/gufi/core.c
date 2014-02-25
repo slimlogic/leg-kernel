@@ -26,10 +26,6 @@
 #include <linux/init.h>
 #include <linux/spinlock.h>
 
-/* TODO: move OF and ACPI functionality to separate files and get rid of this */
-#include <linux/of_device.h>
-#include <linux/acpi.h>
-
 #include "of_protocol.h"
 #include "acpi_protocol.h"
 
