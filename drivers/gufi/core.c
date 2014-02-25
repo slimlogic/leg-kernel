@@ -285,29 +285,19 @@ EXPORT_SYMBOL(gufi_test_match);
 int gufi_property_read_u32(const struct gufi_device_node *gdn,
 		const char *propname, u32 *out_value)
 {
-	int res;
+	struct gufi_protocol *p;
 
 	if (!gdn || !propname || !out_value)
 		return -EINVAL;
 
-	if (acpi_disabled) {
-		res = of_property_read_u32(gdn->dn, propname, out_value);
-	} else {
-		acpi_handle handle = acpi_device_handle(gdn->an);
-		struct acpi_dsm_entry entry;
-
-		res = acpi_dsm_lookup_value(handle, propname, 0, &entry);
-		if (res != 0)
-			return -ENODATA;
-
-		if (kstrtouint(entry.value, 0, out_value) != 0)
-			return -EINVAL;
-
-		kfree(entry.key);
-		kfree(entry.value);
+	list_for_each_entry(p, &__protocols, entry) {
+		if (!p->property_read_u32)
+			continue;
+		return p->property_read_u32(gdn, propname, out_value);
 	}
 
-	return res;
+	pr_err("GUFI: all protocols are missing property_read_u32 callback\n");
+	return -ENODATA;
 }
 EXPORT_SYMBOL(gufi_property_read_u32);
 
@@ -355,6 +345,7 @@ static struct gufi_protocol acpi_protocol = {
 	.node_put = gufi_acpi_node_put,
 	.match_device = gufi_acpi_match_device,
 	.test_match = gufi_acpi_test_match,
+	.property_read_u32 = gufi_acpi_property_read_u32,
 };
 
 static struct gufi_protocol of_protocol = {
@@ -364,6 +355,7 @@ static struct gufi_protocol of_protocol = {
 	.node_put = gufi_of_node_put,
 	.match_device = gufi_of_match_device,
 	.test_match = gufi_of_test_match,
+	.property_read_u32 = gufi_of_property_read_u32,
 };
 
 int __init gufi_init(void)

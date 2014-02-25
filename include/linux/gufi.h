@@ -50,6 +50,8 @@ struct gufi_protocol {
 			const struct gufi_device_id ids,
 			const struct device *dev);
 	bool (*test_match)(const struct gufi_device_id id);
+	int (*property_read_u32)(const struct gufi_device_node *gdn,
+			const char *propname, u32 *out_value);
 };
 
 struct gufi_device_id {

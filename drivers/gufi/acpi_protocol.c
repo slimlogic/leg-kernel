@@ -102,3 +102,23 @@ bool gufi_acpi_test_match(const struct gufi_device_id id)
 {
 	return id.acpi_ids != NULL;
 }
+
+int gufi_acpi_property_read_u32(const struct gufi_device_node *gdn,
+		const char *propname, u32 *out_value)
+{
+	int res;
+	acpi_handle handle = acpi_device_handle(gdn->an);
+	struct acpi_dsm_entry entry;
+
+	res = acpi_dsm_lookup_value(handle, propname, 0, &entry);
+	if (res != 0)
+		return -ENODATA;
+
+	if (kstrtouint(entry.value, 0, out_value) != 0)
+		return -EINVAL;
+
+	kfree(entry.key);
+	kfree(entry.value);
+
+	return res;
+}

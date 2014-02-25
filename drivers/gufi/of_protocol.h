@@ -33,5 +33,7 @@ void gufi_of_node_put(struct gufi_device_node *gdn);
 const struct gufi_device_id gufi_of_match_device(
 		const struct gufi_device_id ids, const struct device *dev);
 bool gufi_of_test_match(const struct gufi_device_id id);
+int gufi_of_property_read_u32(const struct gufi_device_node *gdn,
+		const char *propname, u32 *out_value);
 
 #endif	/*_GUFI_OF_PROTOCOL_H */

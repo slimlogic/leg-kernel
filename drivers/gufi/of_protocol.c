@@ -69,3 +69,9 @@ bool gufi_of_test_match(const struct gufi_device_id id)
 {
 	return id.of_ids != NULL;
 }
+
+int gufi_of_property_read_u32(const struct gufi_device_node *gdn,
+		const char *propname, u32 *out_value)
+{
+	return of_property_read_u32(gdn->dn, propname, out_value);
+}
