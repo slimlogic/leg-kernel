@@ -97,3 +97,8 @@ const struct gufi_device_id gufi_acpi_match_device(
 	res.acpi_ids = acpi_match_device(ids.acpi_ids, dev);
 	return res;
 }
+
+bool gufi_acpi_test_match(const struct gufi_device_id id)
+{
+	return id.acpi_ids != NULL;
+}

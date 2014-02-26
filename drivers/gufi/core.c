@@ -269,7 +269,16 @@ EXPORT_SYMBOL(gufi_match_device);
 
 bool gufi_test_match(const struct gufi_device_id id)
 {
-	return id.of_ids != NULL || id.acpi_ids != NULL;
+	struct gufi_protocol *p;
+
+	list_for_each_entry(p, &__protocols, entry) {
+		if (!p->test_match)
+			continue;
+		return p->test_match(id);
+	}
+
+	pr_err("GUFI: all protocols are missing test_match callback\n");
+	return false;
 }
 EXPORT_SYMBOL(gufi_test_match);
 
@@ -345,6 +354,7 @@ static struct gufi_protocol acpi_protocol = {
 	.node_get = gufi_acpi_node_get,
 	.node_put = gufi_acpi_node_put,
 	.match_device = gufi_acpi_match_device,
+	.test_match = gufi_acpi_test_match,
 };
 
 static struct gufi_protocol of_protocol = {
@@ -353,6 +363,7 @@ static struct gufi_protocol of_protocol = {
 	.node_get = gufi_of_node_get,
 	.node_put = gufi_of_node_put,
 	.match_device = gufi_of_match_device,
+	.test_match = gufi_of_test_match,
 };
 
 int __init gufi_init(void)

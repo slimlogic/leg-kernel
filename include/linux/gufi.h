@@ -49,6 +49,7 @@ struct gufi_protocol {
 	const struct gufi_device_id (*match_device)(
 			const struct gufi_device_id ids,
 			const struct device *dev);
+	bool (*test_match)(const struct gufi_device_id id);
 };
 
 struct gufi_device_id {

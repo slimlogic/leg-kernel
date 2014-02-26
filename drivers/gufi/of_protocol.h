@@ -32,5 +32,6 @@ struct gufi_device_node *gufi_of_node_get(struct gufi_device_node *gdn);
 void gufi_of_node_put(struct gufi_device_node *gdn);
 const struct gufi_device_id gufi_of_match_device(
 		const struct gufi_device_id ids, const struct device *dev);
+bool gufi_of_test_match(const struct gufi_device_id id);
 
 #endif	/*_GUFI_OF_PROTOCOL_H */

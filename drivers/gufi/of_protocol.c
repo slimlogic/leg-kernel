@@ -64,3 +64,8 @@ const struct gufi_device_id gufi_of_match_device(
 	res.of_ids = of_match_device(ids.of_ids, dev);
 	return res;
 }
+
+bool gufi_of_test_match(const struct gufi_device_id id)
+{
+	return id.of_ids != NULL;
+}
